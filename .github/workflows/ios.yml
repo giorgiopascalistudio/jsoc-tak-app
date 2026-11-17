@@ -1,0 +1,43 @@
+name: Build iOS app
+on:
+  push:
+    paths: ["ios/**", ".github/workflows/ios.yml"]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Xcode piu recente
+        run: |
+          ls -d /Applications/Xcode*.app
+          X=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -v -i beta | sort -V | tail -1)
+          [ -n "$X" ] && sudo xcode-select -s "$X"
+          xcodebuild -version
+      - run: brew install xcodegen
+      - name: Build unsigned IPA
+        working-directory: ios
+        run: |
+          xcodegen generate
+          xcodebuild -project HeltecNav.xcodeproj -target HeltecNav -configuration Release \
+            -sdk iphoneos SYMROOT="$PWD/build" CODE_SIGNING_ALLOWED=NO build > build.log 2>&1 || {
+              grep -E "error:|BUILD FAILED" build.log | sort -u | head -80; exit 1; }
+          tail -5 build.log
+          test -f build/Release-iphoneos/HeltecNav.app/HeltecNav
+          # firma ad-hoc con il gruppo app condiviso: Sideloadly lo legge e lo registra (widget e schermo)
+          APP=build/Release-iphoneos/HeltecNav.app
+          for f in "$APP"/Frameworks/*; do [ -e "$f" ] && codesign -f -s - "$f"; done
+          for x in "$APP"/PlugIns/*.appex; do
+            for f in "$x"/Frameworks/*; do [ -e "$f" ] && codesign -f -s - "$f"; done
+            codesign -f -s - --entitlements gruppo.entitlements "$x"
+          done
+          codesign -f -s - --entitlements gruppo.entitlements "$APP"
+          codesign -d --entitlements - "$APP" | tail -5
+          ls "$APP/PlugIns" "$APP/Frameworks" 2>/dev/null || true
+          mkdir -p Payload
+          cp -R build/Release-iphoneos/HeltecNav.app Payload/
+          zip -qry HeltecNav.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: JSOC_TAK-ipa
+          path: ios/HeltecNav.ipa
