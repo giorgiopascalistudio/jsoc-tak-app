@@ -462,30 +462,8 @@ struct HomeV2: View {
 
     struct Luogo: Identifiable { let id: Int; let c: CLLocationCoordinate2D; let e: JEvento }
 
-    @ViewBuilder var luoghi: some View {
-        let l = store.eventi.filter { $0.fase != 2 && $0.lat != nil && $0.lon != nil }
-            .map { Luogo(id: $0.id, c: .init(latitude: $0.lat!, longitude: $0.lon!), e: $0) }
-        if !l.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("LUOGHI DEI PROSSIMI EVENTI").font(.system(size: 12, weight: .heavy)).foregroundStyle(Theme.dim)
-                    Spacer()
-                    Text("senza posizioni dei membri").font(.system(size: 10)).foregroundStyle(Theme.dim)
-                }
-                Map(coordinateRegion: .constant(Self.regione(l.map(\.c))), annotationItems: l) { x in
-                    MapAnnotation(coordinate: x.c) {
-                        Button { percorso.append(x.e) } label: {
-                            Image(systemName: "mappin.circle.fill").font(.system(size: 28)).foregroundStyle(.white, x.e.colore)
-                                .shadow(radius: 3)
-                        }
-                    }
-                }
-                .frame(height: 170)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.stroke))
-            }
-        }
-    }
+    /// box della mappa: campi, sede e luoghi dei prossimi eventi; il tocco apre la Mappa
+    var luoghi: some View { MappaHomeBox(eventi: store.eventi.filter { $0.fase != 2 && $0.stato != "proposto" }) }
 
     static func regione(_ c: [CLLocationCoordinate2D]) -> MKCoordinateRegion {
         let la = c.map(\.latitude), lo = c.map(\.longitude)
