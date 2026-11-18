@@ -164,7 +164,7 @@ extension MappaCtl {
         let src = MLNShapeSource(identifier: "segni", shape: sciolti, options: nil)
         st.addSource(src)
         let grp = MLNShapeSource(identifier: "segni-g", shape: evento,
-                                 options: [.clustered: true, .clusterRadius: 30, .maximumZoomLevelForClustering: 17])
+                                 options: [.clustered: false])   // mai raggruppati: ogni punto resta visibile
         st.addSource(grp)
 
         func etichette(_ id: String, _ s: MLNShapeSource, _ filtro: NSPredicate?) {

@@ -96,6 +96,7 @@ struct MappaTattica: View {
     @State private var selezione: SelezioneMappa?
     /// colonna dei pulsanti a scomparsa (orizzontale con l'isola): esce con uno swipe da sinistra
     @State private var barraVisibile = false
+    @State private var timerBarra: Task<Void, Never>?
     @State private var pannello: PannelloMappa?
     @State private var misura: [CLLocationCoordinate2D] = []
     @State private var nuovoPunto: CoordinataScelta?
@@ -171,7 +172,8 @@ struct MappaTattica: View {
                         }
                         .frame(width: lBarra, alignment: .leading)
                         .clipped()
-                        .background(vetro)
+                        .background(Color(red: 0.035, green: 0.043, blue: 0.027))   // pieno, senza trasparenza
+                        .shadow(color: .black.opacity(0.45), radius: 8, x: 3)        // bordo morbido, niente linea netta
                         .overlay(alignment: .trailing) {
                             // maniglia: ricorda che da qui escono i pulsanti
                             if isola && !barraVisibile {
@@ -184,6 +186,7 @@ struct MappaTattica: View {
                             guard isola else { return }
                             if v.translation.width > 28, !barraVisibile {
                                 haptic(); withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) { barraVisibile = true }
+                                nascondiPresto()
                             } else if v.translation.width < -28, barraVisibile {
                                 withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) { barraVisibile = false }
                             }
@@ -885,8 +888,19 @@ struct MappaTattica: View {
 
     // MARK: barra strumenti
 
+    /// La colonna dei pulsanti si richiude da sola dopo qualche secondo senza tocchi.
+    func nascondiPresto() {
+        timerBarra?.cancel()
+        timerBarra = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            guard !Task.isCancelled else { return }
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) { barraVisibile = false }
+        }
+    }
+
     func barra(_ v: BarraStrumenti.Voce) {
         haptic()
+        if barraVisibile { nascondiPresto() }
         switch v {
         case .esci: vaiAllaScheda(Schede.home)
         case .impostazioni: pannello = pannello == .impostazioni ? nil : .impostazioni
@@ -1170,8 +1184,8 @@ struct BarraStrumenti: View {
         .padding(verticale ? .vertical : .horizontal, verticale ? 8 : 4)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .tint(Theme.olive)
-        .overlay(alignment: verticale ? .trailing : .top) {
-            Rectangle().fill(Theme.stroke).frame(width: verticale ? 1 : nil, height: verticale ? nil : 1)
+        .overlay(alignment: .top) {
+            if !verticale { Rectangle().fill(Theme.stroke).frame(height: 1) }
         }
     }
 

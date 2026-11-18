@@ -28,9 +28,9 @@ final class SegnoAppleView: MKAnnotationView {
         icona.frame = CGRect(x: 0, y: (frame.height - i.size.height) / 2, width: i.size.width, height: i.size.height)
         etichetta.frame = CGRect(x: i.size.width - 4, y: (frame.height - e.size.height) / 2, width: e.size.width, height: e.size.height)
         centerOffset = CGPoint(x: (w - i.size.width) / 2, y: 0)        // l'icona resta sul punto esatto
-        collisionMode = .rectangle
-        displayPriority = s.priorita == 0 ? .required : .defaultHigh
-        clusteringIdentifier = s.chiave.hasPrefix("p") ? "punti" : nil
+        // mai raggruppati né nascosti: ogni punto resta sempre sulla mappa
+        displayPriority = .required
+        clusteringIdentifier = nil
         ruota(s, rotazioneMappa)
     }
 
