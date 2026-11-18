@@ -204,6 +204,27 @@ final class JsocClient: ObservableObject {
 
     var collegato: Bool { !gettone.isEmpty && URL(string: indirizzo) != nil }
 
+    /// Seconda strada verso il server, dentro Tailscale ma per indirizzo numerico: serve ai dispositivi
+    /// su cui il nome .ts.net non si risolve (DNS di Tailscale spento) e danno errore TLS.
+    var alternativo: String { UserDefaults.standard.string(forKey: "jsoc.url2") ?? "" }
+
+    static func erroreDiStrada(_ e: Error) -> Bool {
+        guard let u = e as? URLError else { return false }
+        return [.secureConnectionFailed, .serverCertificateUntrusted, .serverCertificateHasBadDate, .serverCertificateNotYetValid,
+                .serverCertificateHasUnknownRoot, .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed, .clientCertificateRejected].contains(u.code)
+    }
+
+    /// passa all'altra strada (e ci resta) se quella attuale non funziona
+    private func cambiaStrada(_ r: URLRequest) -> URLRequest? {
+        let alt = alternativo
+        guard !alt.isEmpty, alt != indirizzo, let u = r.url?.absoluteString, u.hasPrefix(indirizzo),
+              let nuovo = URL(string: alt + u.dropFirst(indirizzo.count)) else { return nil }
+        indirizzo = alt
+        UserDefaults.standard.set(alt, forKey: "jsoc.url")
+        var x = r; x.url = nuovo
+        return x
+    }
+
     private let sessione: URLSession = {
         let c = URLSessionConfiguration.default
         c.timeoutIntervalForRequest = 15
@@ -221,6 +242,7 @@ final class JsocClient: ObservableObject {
         guard let c = URLComponents(string: t), c.scheme == "jsoctak" else { return nil }
         let q = Dictionary((c.queryItems ?? []).map { ($0.name, $0.value ?? "") }, uniquingKeysWith: { a, _ in a })
         guard let u = q["u"], !u.isEmpty, let cod = q["c"], !cod.isEmpty else { return nil }
+        if let a = q["a"], !a.isEmpty { UserDefaults.standard.set(a.hasSuffix("/") ? String(a.dropLast()) : a, forKey: "jsoc.url2") }
         return (u, cod)
     }
 
@@ -232,8 +254,16 @@ final class JsocClient: ObservableObject {
         r.httpMethod = "POST"
         r.setValue("application/json", forHTTPHeaderField: "Content-Type")
         r.httpBody = try JSONSerialization.data(withJSONObject: ["codice": codice, "nome": nome, "callsign": callsign, "dispositivo": UIDevice.current.model])
-        let ris: Risposta = try await esegui(r)
-        indirizzo = base
+        var dove = base
+        let ris: Risposta
+        do { ris = try await esegui(r, riprova: false) }
+        catch JsocErrore.rete(_) where !alternativo.isEmpty && alternativo != base {
+            // il nome .ts.net non funziona su questo dispositivo: provo l'indirizzo Tailscale numerico
+            dove = alternativo
+            r.url = URL(string: dove + "/api/entra")
+            ris = try await esegui(r, riprova: false)
+        }
+        indirizzo = dove
         gettone = ris.gettone
         UserDefaults.standard.set(base, forKey: "jsoc.url")
         Keychain.set(ris.gettone, for: "jsoc.gettone")
@@ -269,9 +299,12 @@ final class JsocClient: ObservableObject {
         return r
     }
 
-    private func esegui<T: Decodable>(_ r: URLRequest) async throws -> T {
+    private func esegui<T: Decodable>(_ r: URLRequest, riprova: Bool = true) async throws -> T {
         let (data, resp): (Data, URLResponse)
         do { (data, resp) = try await sessione.data(for: r) } catch {
+            if riprova, Self.erroreDiStrada(error), let altra = cambiaStrada(r) {
+                return try await esegui(altra, riprova: false)
+            }
             online = false
             throw JsocErrore.rete(error.localizedDescription)
         }
