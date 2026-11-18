@@ -27,6 +27,7 @@ struct JPunto: Codable, Identifiable, Hashable {
     var resoconto: String? = nil
     var cartella: String? = nil
     var indagine: [JIndagine]? = nil
+    var squadra: String? = nil
     var coordinate: CLLocationCoordinate2D { .init(latitude: lat, longitude: lon) }
     var fatto: Bool { stato == "fatto" }
     var obiettivo: Bool { tipo == "obj" || tipo == "obiettivo" }
@@ -299,7 +300,10 @@ final class JsocClient: ObservableObject {
         try await send("/api/eventi/\(ev)/membri", "POST", ["utente": utente, "ruolo": ruolo.map { $0 as Any } ?? NSNull(), "squadra": squadra])
     }
     func creaPunto(_ ev: Int, nome: String, tipo: String, _ c: CLLocationCoordinate2D, note: String = "") async throws -> JPunto {
-        try await send("/api/eventi/\(ev)/punti", "POST", ["nome": nome, "tipo": tipo, "lat": c.latitude, "lon": c.longitude, "note": note])
+        var b: [String: Any] = ["nome": nome, "tipo": tipo, "lat": c.latitude, "lon": c.longitude, "note": note]
+        // organizzatore che guarda la mappa di una squadra: il punto è di quella squadra
+        if let v = EventoStore.shared.vistaSquadra { b["squadra"] = v }
+        return try await send("/api/eventi/\(ev)/punti", "POST", b)
     }
     func scrivi(_ ev: Int, _ testo: String, _ c: CLLocationCoordinate2D?, dest: Int? = nil, allegato: String? = nil) async throws -> JMessaggio {
         var b: [String: Any] = ["testo": testo]
@@ -410,6 +414,8 @@ final class EventoStore: ObservableObject {
     @Published private(set) var nonLetti = 0
     @Published private(set) var stato = ""
     @Published private(set) var inCoda = 0
+    /// organizzatore di un evento interno: mappa di una sola squadra (attacco/difesa); nil = tutte
+    @Published var vistaSquadra: String?
     var idCorrente: Int {
         get { UserDefaults.standard.integer(forKey: "jsoc.evento") }
         set { UserDefaults.standard.set(newValue, forKey: "jsoc.evento") }

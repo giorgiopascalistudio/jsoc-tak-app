@@ -692,7 +692,7 @@ struct EventoScheda: View {
                 Button {
                     store.scegli(e); vaiAllaScheda(Schede.mappa)
                 } label: {
-                    Label { Text(l).foregroundStyle(.white) + Text(e.lat != nil ? "  · apri in mappa" : "").foregroundStyle(Theme.oliveBright) } icon: { Image(systemName: "mappin") }
+                    Label { Text(l).foregroundColor(.white) + Text(e.lat != nil ? "  · apri in mappa" : "").foregroundColor(Theme.oliveBright) } icon: { Image(systemName: "mappin") }
                         .font(.system(size: 13))
                 }
                 .disabled(!e.membro || e.lat == nil)
@@ -777,7 +777,11 @@ struct EventoScheda: View {
 
     var sezioni: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 8)], spacing: 8) {
-            tasto("map.fill", "Mappa", "squadra e punti") { store.scegli(e); vaiAllaScheda(Schede.mappa) }
+            tasto("map.fill", "Mappa", "squadra e punti") { store.scegli(e); store.vistaSquadra = nil; vaiAllaScheda(Schede.mappa) }
+            if e.interno == 1 {
+                NavigationLink { SquadreView(evento: e) } label: { etichettaTasto("person.2.fill", "Squadre", "Attacco / Difesa") }.buttonStyle(PressStyle())
+            }
+            NavigationLink { SpeseView(evento: e) } label: { etichettaTasto("eurosign.circle.fill", "Spese", "chi deve a chi") }.buttonStyle(PressStyle())
             tasto("folder.fill", "Documenti", "file dell'evento") { store.scegli(e); documenti = true }
             tasto("bubble.left.and.bubble.right.fill", "Chat", "con chi partecipa") { store.scegli(e); UserDefaults.standard.set(true, forKey: "eventi.apriChat"); tutto = true }
             tasto("ellipsis.circle.fill", "Tutte le funzioni", "video, membri, punti") { store.scegli(e); tutto = true }
@@ -785,7 +789,11 @@ struct EventoScheda: View {
     }
 
     func tasto(_ icona: String, _ titolo: String, _ sotto: String, _ f: @escaping () -> Void) -> some View {
-        Button { haptic(); f() } label: {
+        Button { haptic(); f() } label: { etichettaTasto(icona, titolo, sotto) }
+        .buttonStyle(PressStyle())
+    }
+
+    func etichettaTasto(_ icona: String, _ titolo: String, _ sotto: String) -> some View {
             HStack(spacing: 10) {
                 Image(systemName: icona).font(.system(size: 18)).foregroundStyle(Theme.oliveBright).frame(width: 24)
                 VStack(alignment: .leading, spacing: 1) {
@@ -797,8 +805,6 @@ struct EventoScheda: View {
             .padding(11)
             .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14))
             .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Theme.stroke))
-        }
-        .buttonStyle(PressStyle())
     }
 
     @State private var espandi = false

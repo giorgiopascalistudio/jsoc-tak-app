@@ -139,8 +139,14 @@ struct MappaTattica: View {
     @AppStorage("mappa.aree") private var mostraAree = true
     @AppStorage("mappa.squadra") private var mostraSquadra = true
 
-    var punti: [JPunto] { store.corrente?.punti ?? [] }
-    var compagni: [JCompagno] { mostraSquadra ? store.squadra.filter { $0.id != jsoc.utente?.id } : [] }
+    var punti: [JPunto] {
+        let v = store.vistaSquadra
+        return (store.corrente?.punti ?? []).filter { v == nil || ($0.squadra ?? "").isEmpty || $0.squadra == v }
+    }
+    var compagni: [JCompagno] {
+        let v = store.vistaSquadra
+        return mostraSquadra ? store.squadra.filter { $0.id != jsoc.utente?.id && (v == nil || $0.squadra == v) } : []
+    }
 
     var body: some View {
         GeometryReader { g in
@@ -317,6 +323,7 @@ struct MappaTattica: View {
         }
         .onChange(of: punti) { _ in aggiornaSegni() }
         .onChange(of: firmaDisegni) { _ in aggiornaDisegni() }
+        .onChange(of: store.vistaSquadra) { _ in aggiornaSegni(); aggiornaDisegni() }
         .onChange(of: selezione) { _ in aggiornaSegni() }
         .onReceive(store.$squadra) { _ in DispatchQueue.main.async { aggiornaSegni() } }
         .onChange(of: mostraSquadra) { _ in aggiornaSegni() }
@@ -508,7 +515,9 @@ struct MappaTattica: View {
     func aggiornaDisegni() {
         var el: [ElementoLivello] = []
         if mostraAree {
-            el = livelli.tutti(store.corrente?.disegni ?? DatiEvento.disegni, aree: DatiEvento.aree).filter { livelli.visibile($0) }
+            let v = store.vistaSquadra
+            let dis = (store.corrente?.disegni ?? DatiEvento.disegni).filter { v == nil || ($0.squadra ?? "").isEmpty || $0.squadra == v }
+            el = livelli.tutti(dis, aree: DatiEvento.aree).filter { livelli.visibile($0) }
         }
         func cc(_ c: [CLLocationCoordinate2D]) -> [[Double]] { c.map { [$0.latitude, $0.longitude] } }
         if traccia.punti.count >= 2 { el.append(ElementoLivello(id: "t-traccia", tipo: "traccia", coord: cc(traccia.punti), colore: "#FF8C26")) }
@@ -710,6 +719,19 @@ struct MappaTattica: View {
     func comandiOrizzontali(_ bordi: EdgeInsets) -> some View {
         VStack(spacing: 0) {
             HStack(alignment: .top, spacing: 8) {
+                if let v = store.vistaSquadra {
+                    // organizzatore: mappa di una sola squadra
+                    Button { haptic(); store.vistaSquadra = nil; aggiornaSegni(); aggiornaDisegni() } label: {
+                        HStack(spacing: 5) {
+                            Text("MAPPA " + v.uppercased()).font(Theme.mono(11, .heavy))
+                            Image(systemName: "xmark.circle.fill")
+                        }
+                        .foregroundStyle(v == "attacco" ? Theme.red : Theme.cyan)
+                        .padding(.horizontal, 10).frame(height: 32)
+                        .background(Color.black.opacity(0.7), in: Capsule())
+                    }
+                    .accessibilityLabel("Torna alla mappa di tutte le squadre")
+                }
                 Spacer(minLength: 0)
                 BarraRapida(usa: strumento) {
                     pannello = .strumenti

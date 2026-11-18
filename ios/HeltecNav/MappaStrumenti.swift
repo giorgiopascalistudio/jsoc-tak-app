@@ -17,6 +17,7 @@ struct JDisegno: Codable, Identifiable, Hashable {
     let raggi: [Double]?
     let autore: Int?
     var callsign: String? = nil
+    var squadra: String? = nil
     var coordinate: [CLLocationCoordinate2D] { coord.map { .init(latitude: $0[0], longitude: $0[1]) } }
 }
 
@@ -36,8 +37,9 @@ private struct ConteggioImport: Decodable { let punti: Int; let disegni: Int }
 
 extension JsocClient {
     func creaDisegno(_ ev: Int, tipo: String, _ c: [CLLocationCoordinate2D], testo: String = "", colore: String = "", raggi: [Double] = []) async throws -> JDisegno {
-        try await send("/api/eventi/\(ev)/disegni", "POST", ["tipo": tipo, "coord": c.map { [$0.latitude, $0.longitude] },
-                                                              "testo": testo, "colore": colore, "raggi": raggi])
+        var b: [String: Any] = ["tipo": tipo, "coord": c.map { [$0.latitude, $0.longitude] }, "testo": testo, "colore": colore, "raggi": raggi]
+        if let v = EventoStore.shared.vistaSquadra { b["squadra"] = v }
+        return try await send("/api/eventi/\(ev)/disegni", "POST", b)
     }
     func cancellaDisegno(_ id: Int) async throws { let _: JOk = try await send("/api/disegni/\(id)", "DELETE", [String: Any]()) }
     func cancellaPunto(_ id: Int) async throws { let _: JPunto = try await send("/api/punti/\(id)", "DELETE", [String: Any]()) }
