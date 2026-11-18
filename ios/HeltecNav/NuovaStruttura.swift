@@ -134,7 +134,7 @@ struct StrumentiTab: View {
 
     func griglia(_ voci: [Voce]) -> some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 10)], spacing: 10) {
-            ForEach(voci) { v in
+            ForEach(Array(voci.enumerated()), id: \.element.id) { i, v in
                 NavigationLink { v.vista().background(Theme.bg.ignoresSafeArea()).navigationTitle(v.id).navigationBarTitleDisplayMode(.inline) } label: {
                     VStack(alignment: .leading, spacing: 6) {
                         Image(systemName: v.icona).font(.system(size: 22, weight: .semibold)).foregroundStyle(Theme.oliveBright)
@@ -147,6 +147,7 @@ struct StrumentiTab: View {
                     .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.stroke))
                 }
                 .buttonStyle(PressStyle())
+                .comparsa(i)
             }
         }
     }
@@ -245,7 +246,9 @@ struct RigaEventoV2: View {
                 HStack(spacing: 5) {
                     Etichetta(testo: e.nomeTipo, colore: e.colore)
                     if e.tipo != "riunione" { Etichetta(testo: e.interno == 1 ? "INTERNO" : "ESTERNO", colore: Theme.dim) }
-                    if e.proposto { Etichetta(testo: "DA APPROVARE", colore: Theme.amber) }
+                    if e.annullato { Etichetta(testo: "ANNULLATO", colore: Theme.red) }
+                    else if e.privato { Etichetta(testo: "NASCOSTO", colore: Theme.cyan) }
+                    else if e.proposto { Etichetta(testo: "DA APPROVARE", colore: Theme.amber) }
                 }
             }
             Spacer(minLength: 4)
@@ -308,11 +311,11 @@ struct HomeV2: View {
                     intestazione
                     if land {
                         HStack(alignment: .top, spacing: 14) {
-                            VStack(spacing: 12) { banner; calendario }.frame(width: min(420, g.size.width * 0.46))
-                            VStack(alignment: .leading, spacing: 12) { delGiorno; daFare; luoghi }
+                            VStack(spacing: 12) { banner.comparsa(1); calendario.comparsa(2) }.frame(width: min(420, g.size.width * 0.46))
+                            VStack(alignment: .leading, spacing: 12) { delGiorno.comparsa(3); daFare.comparsa(4); luoghi.comparsa(5) }
                         }
                     } else {
-                        banner; calendario; delGiorno; daFare; luoghi
+                        banner.comparsa(1); calendario.comparsa(2); delGiorno.comparsa(3); daFare.comparsa(4); luoghi.comparsa(5)
                     }
                 }
                 .padding(14)
@@ -628,14 +631,23 @@ struct EventoScheda: View {
                     .overlay(alignment: .bottom) { LinearGradient(colors: [.clear, Theme.bg], startPoint: .center, endPoint: .bottom) }
                 VStack(alignment: .leading, spacing: 12) {
                     testata
-                    if e.proposto { proposta }
+                    if e.annullato {
+                        Label("Evento annullato: nel registro presenze non conta", systemImage: "xmark.octagon.fill")
+                            .font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.red)
+                            .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Theme.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
+                            .transition(.scale(scale: 0.9).combined(with: .opacity))
+                    }
+                    if e.privato { nascostoCard }
+                    if e.proposto && !e.privato { proposta }
                     tessere
-                    if !e.proposto && e.fase != 2 { iscrizione }
+                    if !e.proposto && !e.annullato && e.fase != 2 { iscrizione }
                     if let avviso { Text(avviso).font(.caption).foregroundStyle(Theme.oliveBright) }
                     if let errore { ErrorCard(text: errore) }
                     if e.membro && !e.proposto { sezioni }
                     if let n = e.note, !n.isEmpty { descrizione(n) }
                     if let p = presenze { risposteCard(p) }
+                    if gestore && !e.proposto && !e.privato { annullaRiga }
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 80)
@@ -681,6 +693,34 @@ struct EventoScheda: View {
                 .disabled(!e.membro || e.lat == nil)
             }
         }
+    }
+
+    @State private var chiediAnnulla = false
+    var annullaRiga: some View {
+        Button(role: e.annullato ? nil : .destructive) {
+            if e.annullato { azione { try await jsoc.annullaEvento(e.id, false); return "Evento ripristinato" } } else { chiediAnnulla = true }
+        } label: { Label(e.annullato ? "Ripristina l'evento" : "Annulla l'evento", systemImage: e.annullato ? "arrow.uturn.backward" : "xmark.octagon").frame(maxWidth: .infinity) }
+        .buttonStyle(.bordered).tint(e.annullato ? Theme.olive : Theme.red)
+        .padding(.top, 6)
+        .confirmationDialog("Annullare \(e.nome)?", isPresented: $chiediAnnulla, titleVisibility: .visible) {
+            Button("Annulla l'evento", role: .destructive) { azione { try await jsoc.annullaEvento(e.id); return "Evento annullato" } }
+        } message: { Text("Resta nel calendario e nel registro presenze come annullato, per tutti.") }
+    }
+
+    var nascostoCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Evento nascosto: lo vedi solo tu", systemImage: "eye.slash.fill").font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.cyan)
+            Button {
+                azione {
+                    try await jsoc.rendiVisibile(e.id)
+                    await store.aggiorna(jsoc)
+                    return jsoc.utente?.direttivo == true ? "Ora lo vedono tutti" : "Inviato al direttivo per l'approvazione"
+                }
+            } label: { Label("Rendi visibile", systemImage: "eye.fill").frame(maxWidth: .infinity) }
+            .buttonStyle(PrimaryButtonStyle())
+        }
+        .padding(12)
+        .background(Theme.cyan.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
     }
 
     var proposta: some View {
@@ -955,6 +995,7 @@ struct NuovoEventoV2: View {
     @State private var conQuota = false
     @State private var quota = ""
     @State private var domande: [String] = []
+    @State private var nascosto = false
     @State private var nuovaDomanda = ""
     @State private var lavoro = false
     @State private var errore: String?
@@ -1016,7 +1057,10 @@ struct NuovoEventoV2: View {
                     }
                 }
                 Section("Descrizione") { TextField("Programma, regolamento, materiale", text: $note, axis: .vertical).lineLimit(3...10) }
-                if !direttivo {
+                Section {
+                    Toggle(isOn: $nascosto) { Label("Nascosto: lo vedo solo io", systemImage: "eye.slash.fill") }
+                } footer: { Text("Per preparare un evento con calma: nessun altro lo vede finché non lo rendi visibile dalla sua scheda.") }
+                if !direttivo && !nascosto {
                     Section { Label("Lo vedranno tutti dopo l'approvazione del direttivo", systemImage: "checkmark.seal").foregroundStyle(Theme.amber) }
                 }
                 if let errore { Section { Text(errore).foregroundStyle(Theme.red) } }
@@ -1044,7 +1088,8 @@ struct NuovoEventoV2: View {
         let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd'T'HH:mm"
         var campi: [String: Any] = ["nome": nome.trimmingCharacters(in: .whitespaces), "tipo": tipo,
                                     "inizio": f.string(from: inizio), "fine": f.string(from: fine),
-                                    "luogo": luogo, "note": note, "interno": tipo != "riunione" && interno ? 1 : 0, "domande": domande]
+                                    "luogo": luogo, "note": note, "interno": tipo != "riunione" && interno ? 1 : 0, "domande": domande,
+                                    "nascosto": nascosto ? 1 : 0]
         if conScadenza { campi["scadenza"] = f.string(from: scadenza) }
         if conPosti { campi["posti"] = posti }
         if conQuota, let q = Double(quota.replacingOccurrences(of: ",", with: ".")) { campi["quota"] = q }

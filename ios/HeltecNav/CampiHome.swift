@@ -21,6 +21,12 @@ final class CampiStore: ObservableObject {
         guard JsocClient.shared.collegato, let c: JCampi = try? await JsocClient.shared.get("/api/campi") else { return }
         dati = c
         if let d = try? JSONEncoder().encode(c) { UserDefaults.standard.set(d, forKey: chiave) }
+        if EventoStore.shared.inPersonale { EventoStore.shared.apriPersonale() }
+    }
+
+    /// i campi come aree della mappa personale
+    var aree: [GaraArea] {
+        (dati?.campi ?? []).map { GaraArea(nome: $0.nome, tipo: "campo", punti: $0.poly) }
     }
 }
 
@@ -37,7 +43,7 @@ struct MappaHomeBox: View {
                 Spacer()
                 Text("\(campi.dati?.campi.count ?? 0) campi").font(.system(size: 10)).foregroundStyle(Theme.dim)
             }
-            Button { vaiAllaScheda(Schede.mappa) } label: {
+            Button { EventoStore.shared.apriPersonale(); vaiAllaScheda(Schede.mappa) } label: {
                 ZStack(alignment: .bottomTrailing) {
                     MappaStatica(campi: campi.dati, eventi: eventi)
                         .allowsHitTesting(false)

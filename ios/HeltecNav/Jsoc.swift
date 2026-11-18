@@ -92,6 +92,10 @@ struct JEvento: Codable, Identifiable, Hashable {
     var n_si: Int? = nil
     var n_no: Int? = nil
     var n_attesa: Int? = nil
+    var nascosto: Int? = nil
+    var creato_da: Int? = nil
+    var privato: Bool { (nascosto ?? 0) != 0 }
+    var annullato: Bool { stato == "annullato" }
     var punti: [JPunto]? = nil
     var aree: [JArea]? = nil
     var disegni: [JDisegno]? = nil
@@ -444,7 +448,21 @@ final class EventoStore: ObservableObject {
     init() {
         if let d = try? Data(contentsOf: fileEventi), let e = try? JSONDecoder().decode([JEvento].self, from: d) { eventi = e }
         if let d = try? Data(contentsOf: fileCoda), let c = try? JSONDecoder().decode([[String: Double]].self, from: d) { coda = c; inCoda = c.count }
-        if idCorrente != 0 { caricaLocale(idCorrente) }
+        if idCorrente > 0 { caricaLocale(idCorrente) }
+        Livelli.shared.contesto(idCorrente > 0 ? "e\(idCorrente)" : "p")
+        if idCorrente == -1 { DatiEvento.aree = CampiStore.shared.aree }
+    }
+
+    /// Mappa personale: niente evento, si vedono i campi dell'associazione e i propri livelli.
+    var inPersonale: Bool { idCorrente <= 0 }
+    func apriPersonale() {
+        idCorrente = -1
+        corrente = nil; squadra = []; messaggi = []; nonLetti = 0; vistaSquadra = nil
+        DatiEvento.punti = []; DatiEvento.disegni = []
+        DatiEvento.aree = CampiStore.shared.aree
+        DatiEvento.firma = "personale-\(DatiEvento.aree.count)"
+        Livelli.shared.contesto("p")
+        NavStore.shared.objectWillChange.send()
     }
 
     /// Cartella dei documenti dell'evento attivo sul telefono.
@@ -470,6 +488,8 @@ final class EventoStore: ObservableObject {
 
     func scegli(_ e: JEvento) {
         idCorrente = e.id
+        vistaSquadra = nil
+        Livelli.shared.contesto("e\(e.id)")
         squadra = []
         messaggi = []
         nonLetti = 0
@@ -487,13 +507,14 @@ final class EventoStore: ObservableObject {
             try? JSONEncoder().encode(e).write(to: fileEventi, options: .atomic)
             // evento attivo = uno di cui faccio parte: prima quello in corso, poi il prossimo, poi l'ultimo passato
             let miei = e.filter(\.membro)
+            if idCorrente == -1 { if corrente != nil || DatiEvento.aree.isEmpty { apriPersonale() }; return }
             if idCorrente == 0 || !miei.contains(where: { $0.id == idCorrente }) {
                 let scelta = miei.filter { $0.fase == 0 }.first
                     ?? miei.filter { $0.fase == 1 }.min { ($0.dataInizio ?? .distantFuture) < ($1.dataInizio ?? .distantFuture) }
                     ?? miei.first
                 idCorrente = scelta?.id ?? 0
             }
-            guard idCorrente != 0 else { corrente = nil; DatiEvento.punti = []; DatiEvento.aree = []; return }
+            guard idCorrente > 0 else { apriPersonale(); return }
             let ev = try await j.evento(idCorrente)
             applica(ev)
             try? JSONEncoder().encode(ev).write(to: fileEvento(ev.id), options: .atomic)

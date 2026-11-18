@@ -664,6 +664,7 @@ struct MappaTattica: View {
         VStack(spacing: 0) {
             ZStack(alignment: .top) {
                 HStack(alignment: .top) {
+                    ChipContestoMappa()
                     Spacer()
                     tastoTondo(pannello == .impostazioni ? "gearshape.fill" : "gearshape", pannello == .impostazioni ? Theme.oliveBright : oliva) {
                         pannello = pannello == .impostazioni ? nil : .impostazioni
@@ -732,6 +733,7 @@ struct MappaTattica: View {
                     }
                     .accessibilityLabel("Torna alla mappa di tutte le squadre")
                 }
+                ChipContestoMappa()
                 Spacer(minLength: 0)
                 BarraRapida(usa: strumento) {
                     pannello = .strumenti
@@ -2467,5 +2469,36 @@ struct AngoloInverso: Shape {
         }
         p.closeSubpath()
         return p
+    }
+}
+
+
+/// Quale mappa sto guardando: la personale (campi dell'associazione, i miei livelli) o quella di un evento.
+struct ChipContestoMappa: View {
+    @ObservedObject private var store = EventoStore.shared
+
+    var body: some View {
+        Menu {
+            Button { haptic(); store.apriPersonale() } label: { Label("Mappa personale · campi JSOC", systemImage: "person.fill") }
+            let miei = store.eventi.filter { $0.membro && $0.fase != 2 && !$0.proposto }
+            if !miei.isEmpty {
+                Section("Mappe degli eventi") {
+                    ForEach(miei) { e in
+                        Button { haptic(); store.scegli(e) } label: { Label(e.nome, systemImage: e.icona) }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: store.corrente == nil ? "person.fill" : "calendar")
+                Text(store.corrente?.nome.uppercased() ?? "PERSONALE").lineLimit(1)
+                Image(systemName: "chevron.down").font(.system(size: 9, weight: .heavy))
+            }
+            .font(Theme.mono(11, .heavy)).foregroundStyle(.white)
+            .padding(.horizontal, 10).frame(height: 32).frame(maxWidth: 190)
+            .background(Color.black.opacity(0.72), in: Capsule())
+            .overlay(Capsule().strokeBorder(Theme.olive.opacity(0.5)))
+        }
+        .accessibilityLabel("Cambia mappa")
     }
 }

@@ -79,21 +79,41 @@ final class Livelli: ObservableObject {
     @Published private(set) var creati: [String] = []                  // gruppi creati a mano (anche vuoti)
     @Published private(set) var versione = 0
     private let d = UserDefaults.standard
+    /// ogni mappa ha i suoi livelli: "p" = personale, "e<id>" = evento
+    @Published private(set) var chiave = "p"
 
     init() {
-        if let x = d.data(forKey: "livelli.miei"), let v = try? JSONDecoder().decode([ElementoLivello].self, from: x) { miei = v }
-        nascosti = Set(d.stringArray(forKey: "livelli.nascosti") ?? [])
-        gruppi = (d.dictionary(forKey: "livelli.gruppi") as? [String: String]) ?? [:]
-        nomi = (d.dictionary(forKey: "livelli.nomi") as? [String: String]) ?? [:]
-        creati = d.stringArray(forKey: "livelli.creati") ?? []
+        // i livelli di prima (uno solo per tutte le mappe) diventano quelli della mappa personale
+        for k in ["miei", "nascosti", "gruppi", "nomi", "creati"] where d.object(forKey: "livelli.\(k)") != nil && d.object(forKey: "livelli.p.\(k)") == nil {
+            d.set(d.object(forKey: "livelli.\(k)"), forKey: "livelli.p.\(k)")
+            d.removeObject(forKey: "livelli.\(k)")
+        }
+        carica()
+    }
+
+    private func k(_ s: String) -> String { "livelli.\(chiave).\(s)" }
+
+    private func carica() {
+        miei = (d.data(forKey: k("miei")).flatMap { try? JSONDecoder().decode([ElementoLivello].self, from: $0) }) ?? []
+        nascosti = Set(d.stringArray(forKey: k("nascosti")) ?? [])
+        gruppi = (d.dictionary(forKey: k("gruppi")) as? [String: String]) ?? [:]
+        nomi = (d.dictionary(forKey: k("nomi")) as? [String: String]) ?? [:]
+        creati = d.stringArray(forKey: k("creati")) ?? []
+    }
+
+    func contesto(_ c: String) {
+        guard c != chiave else { return }
+        chiave = c
+        carica()
+        versione &+= 1
     }
 
     private func salva() {
-        if let x = try? JSONEncoder().encode(miei) { d.set(x, forKey: "livelli.miei") }
-        d.set(Array(nascosti), forKey: "livelli.nascosti")
-        d.set(gruppi, forKey: "livelli.gruppi")
-        d.set(nomi, forKey: "livelli.nomi")
-        d.set(creati, forKey: "livelli.creati")
+        if let x = try? JSONEncoder().encode(miei) { d.set(x, forKey: k("miei")) }
+        d.set(Array(nascosti), forKey: k("nascosti"))
+        d.set(gruppi, forKey: k("gruppi"))
+        d.set(nomi, forKey: k("nomi"))
+        d.set(creati, forKey: k("creati"))
         versione &+= 1
     }
 

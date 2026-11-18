@@ -272,3 +272,29 @@ struct TailscaleBanner: View {
         }
     }
 }
+
+
+// MARK: - Comparsa animata delle sezioni
+
+/// Le card entrano una dopo l'altra: salgono, si ingrandiscono e si accendono (indice = ordine di entrata).
+struct Comparsa: ViewModifier {
+    let indice: Int
+    @State private var visibile = false
+    @Environment(\.accessibilityReduceMotion) private var riduci
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(visibile ? 1 : 0)
+            .offset(y: visibile || riduci ? 0 : 22)
+            .scaleEffect(visibile || riduci ? 1 : 0.96, anchor: .top)
+            .blur(radius: visibile || riduci ? 0 : 4)
+            .onAppear {
+                guard !visibile else { return }
+                withAnimation(.spring(response: 0.55, dampingFraction: 0.82).delay(riduci ? 0 : Double(min(indice, 12)) * 0.055)) { visibile = true }
+            }
+    }
+}
+
+extension View {
+    func comparsa(_ indice: Int = 0) -> some View { modifier(Comparsa(indice: indice)) }
+}

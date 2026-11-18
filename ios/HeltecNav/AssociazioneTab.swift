@@ -19,36 +19,7 @@ struct AssociazioneTab: View {
         }
     }
 
-    var contenuto: some View {
-        ScrollView {
-            VStack(spacing: 12) {
-                HStack(spacing: 12) {
-                    Image("Stemma").resizable().scaledToFit().frame(width: 56, height: 56)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("JSOC").font(.title2.weight(.heavy))
-                        Text("\(home.dati?.soci_attivi ?? 0) soci attivi").font(Theme.mono(12)).foregroundStyle(Theme.dim)
-                    }
-                    Spacer()
-                }
-                .padding(.bottom, 4)
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-                    voce("newspaper.fill", "Bacheca", conta(home.dati?.post_nuovi, "nuovi")) { BachecaSociView() }
-                    voce("calendar", "Calendario", "eventi e presenze") { CalendarioView() }
-                    voce("person.2.fill", "Soci", direttivo ? "anagrafica e tessere" : "chi siamo") { SociView() }
-                    voce("chart.bar.fill", "Sondaggi", conta(home.dati?.sondaggi_aperti, "da votare")) { SondaggiView() }
-                    voce("eurosign.circle.fill", "Quote", direttivo ? "richieste e incassi" : "la mia quota") { QuoteView() }
-                    if direttivo { voce("banknote.fill", "Cassa", "entrate e uscite") { CassaView() } }
-                    voce("shippingbox.fill", "Magazzino", "materiale e prestiti") { MagazzinoView() }
-                    voce("doc.text.fill", "Documenti", "statuto, regolamenti, moduli") { DocumentiAssociazioneView() }
-                    if direttivo { voce("person.3.sequence.fill", "Gruppi", "squadre e sottogruppi") { GruppiView() } }
-                }
-            }
-            .padding(14)
-        }
-        .refreshable { await home.aggiorna() }
-        .task { await home.aggiorna() }
-    }
+    var contenuto: some View { AssociazioneHomeV2() }
 
     func conta(_ n: Int?, _ t: String) -> String { (n ?? 0) > 0 ? "\(n!) \(t)" : "tutto letto" }
 
@@ -121,7 +92,7 @@ struct BachecaSociView: View {
         .background(Theme.bg.ignoresSafeArea())
         .navigationTitle("Bacheca")
         .toolbar {
-            if jsoc.utente?.direttivo == true {
+            if PermessiStore.shared.puo("avvisi") {
                 Button { scrivi = true } label: { Image(systemName: "square.and.pencil") }
             }
         }
@@ -133,7 +104,8 @@ struct BachecaSociView: View {
 
     func carica() async {
         do { post = try await jsoc.bacheca(); errore = nil } catch { errore = error.localizedDescription }
-        for p in post where !p.letto { await jsoc.letto(p.id) }
+        // gli avvisi con conferma restano "da leggere" finché il socio non tocca Ho letto
+        for p in post where !p.letto && !p.chiedeConferma { await jsoc.letto(p.id) }
         await HomeModel.shared.aggiorna()
     }
 }
@@ -143,6 +115,7 @@ struct PostCard: View {
     var aggiornato: ([JPost]) -> Void
     @State private var commento = ""
     @State private var aperto = false
+    @State private var letture: [JLettura]?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -158,8 +131,25 @@ struct PostCard: View {
             }
             if let t = post.titolo, !t.isEmpty { Text(t).font(.headline) }
             Text(post.testo).font(.subheadline)
+            if post.chiedeConferma && !post.letto {
+                Button {
+                    Task {
+                        await JsocClient.shared.letto(post.id)
+                        if let p = try? await JsocClient.shared.bacheca() { aggiornato(p) }
+                        await HomeModel.shared.aggiorna()
+                    }
+                } label: { Label("Ho letto", systemImage: "checkmark.circle.fill").frame(maxWidth: .infinity) }
+                .buttonStyle(PrimaryButtonStyle())
+            }
             HStack {
-                Label("Letto da \(post.letto_da)/\(post.destinatari)", systemImage: "eye").font(.caption2).foregroundStyle(Theme.dim)
+                if PermessiStore.shared.puo("avvisi") {
+                    Button {
+                        Task { letture = try? await JsocClient.shared.letture(post.id) }
+                    } label: { Label("Letto da \(post.letto_da)/\(post.destinatari)", systemImage: post.chiedeConferma ? "checkmark.seal" : "eye").font(.caption2) }
+                    .tint(Theme.dim)
+                } else {
+                    Label("Letto da \(post.letto_da)/\(post.destinatari)", systemImage: "eye").font(.caption2).foregroundStyle(Theme.dim)
+                }
                 Spacer()
                 Button { withAnimation { aperto.toggle() } } label: {
                     Label("\(post.commenti.count)", systemImage: "bubble.left").font(.caption.weight(.semibold))
@@ -186,7 +176,28 @@ struct PostCard: View {
         }
         .padding(14)
         .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.surface))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(post.fissato == 1 ? Theme.amber.opacity(0.5) : Theme.stroke, lineWidth: 0.75))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(post.chiedeConferma && !post.letto ? Theme.amber : post.fissato == 1 ? Theme.amber.opacity(0.5) : Theme.stroke, lineWidth: post.chiedeConferma && !post.letto ? 1.5 : 0.75))
+        .sheet(isPresented: Binding(get: { letture != nil }, set: { if !$0 { letture = nil } })) {
+            NavigationStack {
+                List {
+                    let l = letture ?? []
+                    Section("Non hanno ancora letto (\(l.filter { !$0.letto }.count))") {
+                        ForEach(l.filter { !$0.letto }, id: \.callsign) { Text($0.callsign).font(Theme.mono(14, .bold)) }
+                    }
+                    Section("Hanno letto (\(l.filter(\.letto).count))") {
+                        ForEach(l.filter(\.letto), id: \.callsign) { x in
+                            HStack {
+                                Text(x.callsign).font(Theme.mono(14, .bold))
+                                Spacer()
+                                if let t = x.ts { Text(Date(timeIntervalSince1970: t).formatted(date: .abbreviated, time: .shortened)).font(.caption2).foregroundStyle(Theme.dim) }
+                            }
+                        }
+                    }
+                }
+                .listaJSOC().navigationTitle("Letture").navigationBarTitleDisplayMode(.inline)
+            }
+            .presentationDetents([.medium, .large])
+        }
     }
 }
 
@@ -196,6 +207,7 @@ struct NuovoPostSheet: View {
     @State private var titolo = ""
     @State private var testo = ""
     @State private var fissato = false
+    @State private var conferma = false
     @State private var errore: String?
 
     var body: some View {
@@ -204,6 +216,7 @@ struct NuovoPostSheet: View {
                 TextField("Titolo", text: $titolo)
                 TextField("Testo dell'annuncio", text: $testo, axis: .vertical).lineLimit(4...12)
                 Toggle("Fissa in alto", isOn: $fissato)
+                Toggle("Chiedi conferma di lettura", isOn: $conferma)
                 if let errore { Text(errore).foregroundStyle(Theme.red) }
             }
             .listaJSOC()
@@ -214,7 +227,7 @@ struct NuovoPostSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Pubblica") {
                         Task {
-                            do { fatto(try await JsocClient.shared.nuovoPost(titolo: titolo, testo: testo, fissato: fissato)); dismiss() }
+                            do { fatto(try await JsocClient.shared.nuovoPost(titolo: titolo, testo: testo, fissato: fissato, conferma: conferma)); dismiss() }
                             catch { errore = error.localizedDescription }
                         }
                     }
@@ -888,6 +901,12 @@ struct DocumentiAssociazioneView: View {
     @State private var anteprima: URL?
     @State private var errore: String?
     @State private var scarica: String?
+    @State private var importa = false
+    @State private var cartella = "Generale"
+    @State private var chiediCartella = false
+    @State private var caricando = false
+    @State private var daCancellare: JFile?
+    @ObservedObject private var permessi = PermessiStore.shared
 
     var body: some View {
         let gruppi = Dictionary(grouping: file) { f -> String in
@@ -895,7 +914,8 @@ struct DocumentiAssociazioneView: View {
             return p.count > 1 ? String(p[0]) : "Generale"
         }
         List {
-            if file.isEmpty { Text("Nessun documento. Il direttivo li carica nella cartella del server.").foregroundStyle(Theme.dim).listRowBackground(Theme.surface) }
+            if file.isEmpty { Text("Nessun documento ancora.").foregroundStyle(Theme.dim).listRowBackground(Theme.surface) }
+            if caricando { HStack { ProgressView(); Text("Carico…") }.listRowBackground(Theme.surface) }
             ForEach(gruppi.keys.sorted(), id: \.self) { g in
                 Section(g) {
                     ForEach(gruppi[g] ?? [], id: \.percorso) { f in
@@ -908,6 +928,11 @@ struct DocumentiAssociazioneView: View {
                                 else { Text(ByteCountFormatter.string(fromByteCount: Int64(f.dim), countStyle: .file)).font(.caption2).foregroundStyle(Theme.dim) }
                             }
                         }
+                        .swipeActions {
+                            if permessi.puo("documenti") {
+                                Button(role: .destructive) { daCancellare = f } label: { Label("Elimina", systemImage: "trash") }
+                            }
+                        }
                     }
                 }
                 .listRowBackground(Theme.surface)
@@ -915,6 +940,31 @@ struct DocumentiAssociazioneView: View {
         }
         .listaJSOC()
         .navigationTitle("Documenti")
+        .toolbar {
+            if permessi.puo("documenti") {
+                Button { chiediCartella = true } label: { Image(systemName: "square.and.arrow.up") }
+                    .accessibilityLabel("Carica un documento")
+            }
+        }
+        .alert("In quale cartella?", isPresented: $chiediCartella) {
+            TextField("Cartella (es. Verbali, Moduli, Statuto)", text: $cartella)
+            Button("Scegli il file") { importa = true }
+            Button("Annulla", role: .cancel) {}
+        } message: { Text("Poi scegli il file da File, iCloud o dal telefono.") }
+        .fileImporter(isPresented: $importa, allowedContentTypes: [.item], allowsMultipleSelection: true) { esito in
+            guard case .success(let urls) = esito else { return }
+            Task { await carica(urls) }
+        }
+        .confirmationDialog("Eliminare il documento?", isPresented: Binding(get: { daCancellare != nil }, set: { if !$0 { daCancellare = nil } }), titleVisibility: .visible) {
+            Button("Elimina", role: .destructive) {
+                if let f = daCancellare {
+                    Task {
+                        do { let _: JOk = try await JsocClient.shared.send("/api/associazione/file/" + percorsoURL(f.percorso), "DELETE", [String: String]()); await carica() }
+                        catch { errore = error.localizedDescription }
+                    }
+                }
+            }
+        }
         .quickLookPreview($anteprima)
         .task { await carica() }
         .refreshable { await carica() }
@@ -932,6 +982,21 @@ struct DocumentiAssociazioneView: View {
 
     func carica() async {
         do { file = try await JsocClient.shared.documentiAssociazione(); errore = nil } catch { errore = error.localizedDescription }
+    }
+
+    func carica(_ urls: [URL]) async {
+        caricando = true
+        defer { caricando = false }
+        let dir = cartella.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "/", with: "-")
+        for u in urls {
+            let ok = u.startAccessingSecurityScopedResource()
+            defer { if ok { u.stopAccessingSecurityScopedResource() } }
+            guard let d = try? Data(contentsOf: u) else { errore = "Non riesco a leggere " + u.lastPathComponent; continue }
+            let rel = (dir.isEmpty || dir == "Generale" ? "" : dir + "/") + u.lastPathComponent
+            do { try await JsocClient.shared.caricaDati("/api/associazione/file/" + percorsoURL(rel), dati: d) }
+            catch { errore = error.localizedDescription }
+        }
+        await carica()
     }
 
     func apri(_ f: JFile) {

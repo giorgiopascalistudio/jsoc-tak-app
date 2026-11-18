@@ -543,6 +543,7 @@ struct NuovoEventoSheet: View {
 struct InvitoSheet: View {
     @Environment(\.dismiss) var dismiss
     var dispositivo = false
+    var ruoloIniziale = "socio"
     @State private var ruolo = "socio"
     @State private var invito: JInvito?
     @State private var errore: String?
@@ -555,6 +556,7 @@ struct InvitoSheet: View {
                         .font(.subheadline).foregroundStyle(Theme.dim).multilineTextAlignment(.center)
                 } else {
                 Picker("Ruolo", selection: $ruolo) {
+                    Text("Aspirante").tag("aspirante")
                     Text("Socio").tag("socio")
                     Text("Direttivo").tag("direttivo")
                 }
@@ -581,6 +583,7 @@ struct InvitoSheet: View {
             .padding(20)
             .background(Theme.bg.ignoresSafeArea())
             .task { if dispositivo { crea() } }
+            .onAppear { if !dispositivo { ruolo = ruoloIniziale } }
             .navigationTitle(dispositivo ? "Collega dispositivo" : "Invita")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Fine") { dismiss() } } }

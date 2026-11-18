@@ -135,6 +135,8 @@ struct JPost: Codable, Identifiable, Hashable {
     let letto_da: Int
     let letto: Bool
     let destinatari: Int
+    var conferma: Int? = nil
+    var chiedeConferma: Bool { (conferma ?? 0) != 0 }
 }
 
 struct JSondaggio: Codable, Identifiable, Hashable {
@@ -192,6 +194,8 @@ extension JsocClient {
         try await send("/api/eventi/\(ev)/presenza", "POST", ["risposta": r, "risposte": risposte])
     }
     func approvaEvento(_ ev: Int) async throws { let _: JOk = try await send("/api/eventi/\(ev)/approva", "POST", [String: Any]()) }
+    func rendiVisibile(_ ev: Int) async throws { let _: JEvento = try await send("/api/eventi/\(ev)", "PUT", ["nascosto": 0]) }
+    func annullaEvento(_ ev: Int, _ si: Bool = true) async throws { let _: JOk = try await send("/api/eventi/\(ev)/annulla", "POST", ["annullato": si]) }
     func togliEvento(_ ev: Int) async throws { let _: JOk = try await send("/api/eventi/\(ev)", "DELETE", [String: Any]()) }
     func promemoria(_ ev: Int) async throws -> Int {
         struct R: Codable { let quanti: Int? }
@@ -202,8 +206,8 @@ extension JsocClient {
         try await send("/api/eventi/\(ev)/presenze", "POST", ["utente": utente, "presente": presente])
     }
     func bacheca() async throws -> [JPost] { try await get("/api/bacheca") }
-    func nuovoPost(titolo: String, testo: String, fissato: Bool) async throws -> [JPost] {
-        try await send("/api/bacheca", "POST", ["titolo": titolo, "testo": testo, "fissato": fissato])
+    func nuovoPost(titolo: String, testo: String, fissato: Bool, conferma: Bool = false) async throws -> [JPost] {
+        try await send("/api/bacheca", "POST", ["titolo": titolo, "testo": testo, "fissato": fissato, "conferma": conferma])
     }
     func commenta(_ post: Int, _ testo: String) async throws -> [JPost] { try await send("/api/bacheca/\(post)/commenti", "POST", ["testo": testo]) }
     func letto(_ post: Int) async { let _: JOk? = try? await send("/api/bacheca/\(post)/letto", "POST", [String: Any]()) }
