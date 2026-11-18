@@ -59,7 +59,7 @@ struct JSocioLibro: Codable, Identifiable {
     let ammesso: String?; let uscito: String?; let uscita_motivo: String?; let creato: Double?; let attivo: Int; let telefono: String?; let email: String?
 }
 
-struct JMovimento: Codable, Identifiable, Hashable {
+struct JMov2: Codable, Identifiable, Hashable {
     let id: Int; let data: String; let tipo: String; let categoria: String?; let importo: Double; let descrizione: String?
     let utente: Int?; let ricevuta: String?; let conto: String?; let conto_a: String?; let natura: String?; let evento: Int?
     let numero: String?; let modificato: Double?; let importato: Int?; let destinazione: String?
@@ -69,7 +69,7 @@ struct JMovimento: Codable, Identifiable, Hashable {
 struct JCategoriaTot: Codable, Hashable { let tipo: String; let categoria: String; let totale: Double }
 struct JBudget: Codable, Hashable { let categoria: String; let importo: Double; let speso: Double }
 struct JCassa2: Codable {
-    let anno: Int; let anni: [String]; let movimenti: [JMovimento]; let saldi: [String: Double]; let disponibile: Double
+    let anno: Int; let anni: [String]; let movimenti: [JMov2]; let saldi: [String: Double]; let disponibile: Double
     let entrate: Double; let uscite: Double; let categorie: [JCategoriaTot]; let budget: [JBudget]; let da_incassare: Double
     let destinati: [String: Double]; let conti: [String]; let soglia_ok: Double?
 }
@@ -110,8 +110,8 @@ extension JsocClient {
     func libroSoci() async throws -> [JSocioLibro] { try await get("/api/libro-soci") }
     func uscitaSocio(_ id: Int, motivo: String) async throws -> [JSocioLibro] { try await send("/api/utenti/\(id)/uscita", "POST", ["motivo": motivo]) }
     func cassa2(_ anno: Int) async throws -> JCassa2 { try await get("/api/cassa2?anno=\(anno)") }
-    func nuovoMovimento2(_ c: [String: Any]) async throws -> JMovimento { try await send("/api/cassa2", "POST", c) }
-    func modificaMovimento(_ id: Int, _ c: [String: Any]) async throws -> JMovimento { try await send("/api/cassa2/\(id)", "PUT", c) }
+    func nuovoMovimento2(_ c: [String: Any]) async throws -> JMov2 { try await send("/api/cassa2", "POST", c) }
+    func modificaMovimento(_ id: Int, _ c: [String: Any]) async throws -> JMov2 { try await send("/api/cassa2/\(id)", "PUT", c) }
     func cancellaMovimento2(_ id: Int) async throws { let _: JOk = try await send("/api/cassa2/\(id)", "DELETE", [String: String]()) }
     func salvaBudget(_ anno: Int, _ voci: [String: Double]) async throws -> JCassa2 { try await send("/api/cassa2/budget", "POST", ["anno": anno, "voci": voci]) }
     func rendiconto(_ anno: Int) async throws -> JRendiconto { try await get("/api/rendiconto?anno=\(anno)") }
@@ -868,14 +868,16 @@ struct CassaV2View: View {
     @State private var mese = 0
     @State private var cerca = ""
     @State private var nuovo = false
-    @State private var modifica: JMovimento?
+    @State private var modifica: JMov2?
     @State private var budget = false
     @State private var errore: String?
 
-    var movimenti: [JMovimento] {
+    var movimenti: [JMov2] {
         (c?.movimenti ?? []).filter { m in
-            (mese == 0 || Int(m.data.dropFirst(5).prefix(2)) == mese) &&
-            (cerca.isEmpty || (m.descrizione ?? "").localizedCaseInsensitiveContains(cerca) || (m.categoria ?? "").localizedCaseInsensitiveContains(cerca) || (m.callsign ?? "").localizedCaseInsensitiveContains(cerca))
+            if mese != 0 && Int(m.data.dropFirst(5).prefix(2)) != mese { return false }
+            if cerca.isEmpty { return true }
+            let testo: String = [m.descrizione ?? "", m.categoria ?? "", m.callsign ?? ""].joined(separator: " ")
+            return testo.localizedCaseInsensitiveContains(cerca)
         }
     }
 
@@ -904,8 +906,8 @@ struct CassaV2View: View {
         .toolbar { Button { nuovo = true } label: { Label("Movimento", systemImage: "plus.circle.fill") } }
         .task(id: anno) { await carica() }
         .refreshable { await carica() }
-        .sheet(isPresented: $nuovo) { MovimentoSheet(esistente: nil, soglia: c?.soglia_ok ?? 100) { Task { await carica() } } }
-        .sheet(item: $modifica) { m in MovimentoSheet(esistente: m, soglia: c?.soglia_ok ?? 100) { Task { await carica() } } }
+        .sheet(isPresented: $nuovo) { MovimentoSheet2(esistente: nil, soglia: c?.soglia_ok ?? 100) { Task { await carica() } } }
+        .sheet(item: $modifica) { m in MovimentoSheet2(esistente: m, soglia: c?.soglia_ok ?? 100) { Task { await carica() } } }
         .sheet(isPresented: $budget) { if let c { BudgetSheet(anno: anno, c: c) { self.c = $0 } } }
     }
 
@@ -945,16 +947,12 @@ struct CassaV2View: View {
         Section {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
-                    ForEach(0..<13, id: \.self) { m in
-                        Button(m == 0 ? "Tutto l'anno" : Calendar.current.shortMonthSymbols[m - 1].capitalized) { mese = m }
-                            .font(.caption.weight(.bold)).padding(.horizontal, 10).padding(.vertical, 6)
-                            .background(mese == m ? Theme.olive : Theme.surface2, in: Capsule()).foregroundStyle(mese == m ? .black : .white)
-                    }
+                    ForEach(0..<13, id: \.self) { m in chipMese(m) }
                 }
             }
             .buttonStyle(.plain)
-            let ent = movimenti.filter { $0.tipo == "entrata" }.reduce(0) { $0 + $1.importo }
-            let usc = movimenti.filter { $0.tipo == "uscita" }.reduce(0) { $0 + $1.importo }
+            let ent: Double = totale("entrata")
+            let usc: Double = totale("uscita")
             HStack { Text("Entrate +\(euroIT(ent))").foregroundStyle(Theme.oliveBright); Spacer(); Text("Uscite −\(euroIT(usc))").foregroundStyle(Theme.red) }
                 .font(.caption.weight(.heavy))
         }
@@ -969,10 +967,25 @@ struct CassaV2View: View {
         }
     }
 
+    func totale(_ tipo: String) -> Double {
+        var t = 0.0
+        for m in movimenti where m.tipo == tipo { t += m.importo }
+        return t
+    }
+
+    func chipMese(_ m: Int) -> some View {
+        let attivo = mese == m
+        let nome: String = m == 0 ? "Tutto l'anno" : Calendar.current.shortMonthSymbols[m - 1].capitalized
+        return Button(nome) { mese = m }
+            .font(.caption.weight(.bold)).padding(.horizontal, 10).padding(.vertical, 6)
+            .background(attivo ? Theme.olive : Theme.surface2, in: Capsule())
+            .foregroundStyle(attivo ? Color.black : Color.white)
+    }
+
     @ViewBuilder func categorie(_ c: JCassa2) -> some View {
         ForEach(["entrata", "uscita"], id: \.self) { t in
             let v = c.categorie.filter { $0.tipo == t }.sorted { $0.totale > $1.totale }
-            let tot = max(1, v.reduce(0) { $0 + $1.totale })
+            let tot: Double = max(1.0, v.map(\.totale).reduce(0.0, +))
             Section(t == "entrata" ? "Entrate per voce" : "Uscite per voce") {
                 ForEach(v, id: \.self) { x in
                     VStack(alignment: .leading, spacing: 3) {
@@ -1004,7 +1017,7 @@ struct CassaV2View: View {
 }
 
 struct RigaMovimento: View {
-    let m: JMovimento
+    let m: JMov2
     var body: some View {
         HStack(spacing: 10) {
             VStack(spacing: 0) {
@@ -1042,8 +1055,8 @@ struct RigaMovimento: View {
     }
 }
 
-struct MovimentoSheet: View {
-    let esistente: JMovimento?
+struct MovimentoSheet2: View {
+    let esistente: JMov2?
     let soglia: Double
     var fatto: () -> Void
     @Environment(\.dismiss) private var dismiss
@@ -1233,9 +1246,9 @@ struct RendicontoView: View {
                     riga("Saldo a fine anno", r.saldo_finale, bold: true)
                 }
                 if let s = r.saldi_conti {
-                    Section("Quadratura dei conti (oggi)") {
+                    Section {
                         ForEach(s.keys.sorted(), id: \.self) { k in riga(NomiAssoc.conto(k), s[k] ?? 0) }
-                    } footer: { Text("Confronta con l'estratto conto della banca e con la conta dei contanti.") }
+                    } header: { Text("Quadratura dei conti (oggi)") } footer: { Text("Confronta con l'estratto conto della banca e con la conta dei contanti.") }
                 }
                 Section {
                     Button { esporta(r) } label: { Label("Esporta (CSV per Excel)", systemImage: "square.and.arrow.up") }
