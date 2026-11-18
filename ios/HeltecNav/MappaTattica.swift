@@ -172,8 +172,7 @@ struct MappaTattica: View {
                         }
                         .frame(width: lBarra, alignment: .leading)
                         .clipped()
-                        .background(Color(red: 0.035, green: 0.043, blue: 0.027))   // pieno, senza trasparenza
-                        .shadow(color: .black.opacity(0.45), radius: 8, x: 3)        // bordo morbido, niente linea netta
+                        .background(Color.black, in: ArrotondatoDestra(r: 22))   // nera, con gli angoli verso la mappa arrotondati
                         .overlay(alignment: .trailing) {
                             // maniglia: ricorda che da qui escono i pulsanti
                             if isola && !barraVisibile {
@@ -2401,5 +2400,22 @@ struct Batteria: View {
         UIDevice.current.isBatteryMonitoringEnabled = true
         let l = UIDevice.current.batteryLevel
         return l < 0 ? 100 : Int((l * 100).rounded())
+    }
+}
+
+
+/// Rettangolo con i soli angoli destri arrotondati (colonna laterale verso la mappa).
+struct ArrotondatoDestra: Shape {
+    var r: CGFloat
+    func path(in q: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: q.minX, y: q.minY))
+        p.addLine(to: CGPoint(x: q.maxX - r, y: q.minY))
+        p.addArc(center: CGPoint(x: q.maxX - r, y: q.minY + r), radius: r, startAngle: .degrees(-90), endAngle: .degrees(0), clockwise: false)
+        p.addLine(to: CGPoint(x: q.maxX, y: q.maxY - r))
+        p.addArc(center: CGPoint(x: q.maxX - r, y: q.maxY - r), radius: r, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false)
+        p.addLine(to: CGPoint(x: q.minX, y: q.maxY))
+        p.closeSubpath()
+        return p
     }
 }
