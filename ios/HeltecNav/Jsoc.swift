@@ -205,7 +205,7 @@ final class JsocClient: ObservableObject {
     var collegato: Bool { !gettone.isEmpty && URL(string: indirizzo) != nil }
 
     /// Seconda strada verso il server, dentro Tailscale ma per indirizzo numerico: serve ai dispositivi
-    /// su cui il nome .ts.net non si risolve (DNS di Tailscale spento) e danno errore TLS.
+    /// su cui il nome del server non si risolve (DNS di Tailscale spento) e danno errore TLS.
     var alternativo: String { UserDefaults.standard.string(forKey: "jsoc.url2") ?? "" }
 
     static func erroreDiStrada(_ e: Error) -> Bool {
@@ -258,7 +258,7 @@ final class JsocClient: ObservableObject {
         let ris: Risposta
         do { ris = try await esegui(r, riprova: false) }
         catch JsocErrore.rete(_) where !alternativo.isEmpty && alternativo != base {
-            // il nome .ts.net non funziona su questo dispositivo: provo l'indirizzo Tailscale numerico
+            // il nome del server non funziona su questo dispositivo: provo l'indirizzo Tailscale numerico
             dove = alternativo
             r.url = URL(string: dove + "/api/entra")
             ris = try await esegui(r, riprova: false)
