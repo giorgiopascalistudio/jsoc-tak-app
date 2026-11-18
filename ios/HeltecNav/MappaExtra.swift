@@ -65,7 +65,7 @@ struct PannelloMeteo: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            TestataPannello(titolo: "Meteo e vento", sotto: coordTesto(dove), chiudi: chiudi)
+            TestataPannello(titolo: "Meteo e vento", sotto: "zona inquadrata · " + coordTesto(dove), chiudi: chiudi)
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     Toggle("Radar pioggia sulla mappa", isOn: $radar).tint(Theme.olive).font(.system(size: 14))
@@ -122,8 +122,11 @@ struct PannelloMeteo: View {
                 .padding(14)
             }
         }
-        .task {
-            do { (adesso, ore) = try await MeteoServizio.carica(dove) } catch { errore = "Meteo non disponibile (serve rete)" }
+        // scorrendo la mappa si aggiorna quando la zona inquadrata cambia di circa 1 km
+        .task(id: String(format: "%.2f,%.2f", dove.latitude, dove.longitude)) {
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            guard !Task.isCancelled else { return }
+            do { (adesso, ore) = try await MeteoServizio.carica(dove); errore = nil } catch { if adesso == nil { errore = "Meteo non disponibile (serve rete)" } }
         }
     }
 

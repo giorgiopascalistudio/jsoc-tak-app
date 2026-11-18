@@ -56,6 +56,7 @@ struct MappaApple: UIViewRepresentable {
         m.register(SegnoAppleView.self, forAnnotationViewWithReuseIdentifier: "segno")
         m.register(GruppoAppleView.self, forAnnotationViewWithReuseIdentifier: "gruppo")
         m.register(ConoAppleView.self, forAnnotationViewWithReuseIdentifier: "io")
+        m.register(SimboloAppleView.self, forAnnotationViewWithReuseIdentifier: "simbolo")
         context.coordinator.mappa = m
         context.coordinator.avviaBussola()
         let c = ctl.centro
@@ -68,6 +69,7 @@ struct MappaApple: UIViewRepresentable {
         ctl.mk = m
         ctl.configuraApple()
         ctl.applicaSegniApple()
+        ctl.applicaDisegniApple()
         return m
     }
 
@@ -131,6 +133,11 @@ struct MappaApple: UIViewRepresentable {
                 v.dirigi(direzione.map { $0 - m.camera.heading })
                 return v
             }
+            if let s = annotation as? SimboloAnnotation {
+                let v = m.dequeueReusableAnnotationView(withIdentifier: "simbolo", for: s) as! SimboloAppleView
+                v.configura(s, rotazioneMappa: m.camera.heading)
+                return v
+            }
             if let g = annotation as? MKClusterAnnotation {
                 let v = m.dequeueReusableAnnotationView(withIdentifier: "gruppo", for: g) as! GruppoAppleView
                 v.mostra(g.memberAnnotations.count)
@@ -146,9 +153,14 @@ struct MappaApple: UIViewRepresentable {
             let h = m.camera.heading
             for a in m.annotations {
                 if let s = a as? SegnoAnnotation, s.segno.rotazione != nil, let v = m.view(for: s) as? SegnoAppleView { v.ruota(s.segno, h) }
+                if let s = a as? SimboloAnnotation, s.simbolo.ruota, let v = m.view(for: s) as? SimboloAppleView { v.ruota(s, h) }
             }
             aggiornaCono()
             Task { @MainActor in self.parent.ctl.aggiornaDaMappa() }
+        }
+
+        func mapView(_ m: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            DisegniApple.renderer(overlay) ?? MKOverlayRenderer(overlay: overlay)
         }
 
         func mapView(_ m: MKMapView, regionDidChangeAnimated animated: Bool) {

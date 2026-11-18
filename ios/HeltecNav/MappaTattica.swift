@@ -122,6 +122,7 @@ struct MappaTattica: View {
     @State private var carta: UIImage?
     @State private var cartaTrasparenza = 0.55
     @ObservedObject private var rotta = RottaAttiva.shared
+    @ObservedObject private var livelli = Livelli.shared
     @ObservedObject private var lora = LoRaMesh.shared
     @ObservedObject private var importate = MappeImportate.shared
     @ObservedObject private var telecamere = TelecamerePubbliche.shared
@@ -234,7 +235,14 @@ struct MappaTattica: View {
             UIApplication.shared.isIdleTimerDisabled = true
             ruotaSchermo(.landscape)
             aggiornaSegni()
+            aggiornaDisegni()
             applicaLivelli()
+            if !UserDefaults.standard.bool(forKey: "mappa.rapidi.segnala") {
+                // "Segnala" lascia la colonna laterale (ora c'è Livelli): va nella barra in alto
+                UserDefaults.standard.set(true, forKey: "mappa.rapidi.segnala")
+                let e = BarraRapida.elenco
+                if !e.contains("segnala") { UserDefaults.standard.set((["segnala"] + e).prefix(8).joined(separator: ","), forKey: "mappa.rapidi") }
+            }
             volume.azione = { tastoVolume($0) }
             volume.sos = { avviaSOS() }
             volume.avvia()
@@ -288,9 +296,18 @@ struct MappaTattica: View {
             case (.disegno, .disegno?), (.rotta, .rotta?), (.cerchi, .cerchi?), (.vista, .profilo?): tieni = true
             default: tieni = false
             }
-            if !tieni && modo != nil { modo = nil; vertici = []; lineaVista = []; if p != .rotta { } }
+            if !tieni && modo != nil {
+                if modo == .cerchi, let c = cerchiCentro, !cerchiRaggi.isEmpty {
+                    // i cerchi non condivisi restano nei Livelli di questo telefono
+                    Livelli.shared.aggiungi(ElementoLivello(id: "l" + UUID().uuidString, tipo: "cerchi", coord: [[c.latitude, c.longitude]],
+                                                            testo: "Cerchi", colore: esadecimale(Theme.amber), raggi: cerchiRaggi))
+                    cerchiCentro = nil
+                }
+                modo = nil; vertici = []; lineaVista = []
+            }
         }
         .onChange(of: punti) { _ in aggiornaSegni() }
+        .onChange(of: firmaDisegni) { _ in aggiornaDisegni() }
         .onChange(of: selezione) { _ in aggiornaSegni() }
         .onReceive(store.$squadra) { _ in DispatchQueue.main.async { aggiornaSegni() } }
         .onChange(of: mostraSquadra) { _ in aggiornaSegni() }
@@ -358,11 +375,11 @@ struct MappaTattica: View {
             } else {
                 MappaLibre(ctl: ctl, tocco: { p, _ in toccoMappa(p) }, mira: { stato, p in croce(stato, p) })
             }
-            Sovrapposizioni(ctl: ctl, griglia: griglia, aree: mostraAree ? DatiEvento.aree : [], misura: misura,
-                            traccia: traccia.punti, me: location.location?.coordinate, target: nav.target?.coordinate)
+            Sovrapposizioni(ctl: ctl, griglia: griglia, aree: [], misura: [],
+                            traccia: [], me: location.location?.coordinate, target: nav.target?.coordinate)
                 .allowsHitTesting(false)
-            Sovrapposizioni2(ctl: ctl, disegni: mostraAree ? DatiEvento.disegni : [], bozza: vertici, tipoBozza: modoTipo,
-                             rotta: rotta.tappe, cerchi: modo == .cerchi ? cerchiCentro : nil, raggi: cerchiRaggi, vista: lineaVista,
+            Sovrapposizioni2(ctl: ctl, disegni: [], bozza: vertici, tipoBozza: modoTipo,
+                             rotta: [], cerchi: nil, raggi: cerchiRaggi, vista: lineaVista,
                              raggiVista: pannello == .vista360 ? raggiVista : [],
                              replay: pannello == .replay ? PannelloReplay.posizioni(replayTracce, replayT) : [])
                 .allowsHitTesting(false)
@@ -473,6 +490,36 @@ struct MappaTattica: View {
     }
 
     /// Tocco sulla mappa: MapLibre dice quali segnaposti ci sono sotto il dito. Se più d'uno, chiedo quale.
+    /// Cambia quando cambia qualcosa da disegnare sulla mappa.
+    var firmaDisegni: String {
+        let d = store.corrente?.disegni ?? []
+        return "\(d.count)-\(d.last?.id ?? 0)-\(misura.count)-\(misura.last?.latitude ?? 0)-\(cerchiCentro?.latitude ?? 0)-\(cerchiCentro?.longitude ?? 0)-\(cerchiRaggi)-\(modo == .cerchi)-\(rotta.tappe.count)-\(rotta.tappe.last?.longitude ?? 0)-\(traccia.punti.count)-\(mostraAree)-\(livelli.versione)-\(DatiEvento.aree.count)"
+    }
+
+    func aggiornaDisegni() {
+        var el: [ElementoLivello] = []
+        if mostraAree {
+            el = livelli.tutti(store.corrente?.disegni ?? DatiEvento.disegni, aree: DatiEvento.aree).filter { livelli.visibile($0) }
+        }
+        func cc(_ c: [CLLocationCoordinate2D]) -> [[Double]] { c.map { [$0.latitude, $0.longitude] } }
+        if traccia.punti.count >= 2 { el.append(ElementoLivello(id: "t-traccia", tipo: "traccia", coord: cc(traccia.punti), colore: "#FF8C26")) }
+        if rotta.tappe.count >= 1 { el.append(ElementoLivello(id: "t-rotta", tipo: "rotta", coord: cc(rotta.tappe), colore: esadecimale(Theme.oliveBright))) }
+        if misura.count >= 1 { el.append(ElementoLivello(id: "t-misura", tipo: "misura", coord: cc(misura), colore: esadecimale(Theme.amber), tratteggio: true)) }
+        if modo == .cerchi, let c = cerchiCentro {
+            el.append(ElementoLivello(id: "t-cerchi", tipo: "cerchi", coord: [[c.latitude, c.longitude]], colore: esadecimale(Theme.amber), raggi: cerchiRaggi))
+        }
+        ctl.impostaDisegni(el)
+    }
+
+    func salvaMisura() {
+        guard misura.count >= 2 else { return }
+        var tot = 0.0
+        for i in 1..<misura.count { tot += Geo.distance(misura[i - 1], misura[i]) }
+        Livelli.shared.aggiungi(ElementoLivello(id: "l" + UUID().uuidString, tipo: "misura", coord: misura.map { [$0.latitude, $0.longitude] },
+                                                testo: "Misura " + Geo.formatDistance(tot), colore: esadecimale(Theme.amber), tratteggio: true))
+        mostra("Misura salvata in Livelli")
+    }
+
     func toccoMappa(_ p: CGPoint) {
         if barraVisibile { withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) { barraVisibile = false } }
         if selezione != nil || !scelta.isEmpty { withAnimation(.spring(response: 0.3)) { selezione = nil; scelta = [] }; return }
@@ -846,7 +893,7 @@ struct MappaTattica: View {
         case .notte: withAnimation(.easeInOut(duration: 0.25)) { night.toggle() }
         case .punto: pannello = .nuovoPunto(ctl.centro.latitude, ctl.centro.longitude)
         case .misura:
-            if pannello == .misura { pannello = nil; misura = [] } else { misura = []; pannello = .misura; mostra("Tieni premuto sulla mappa per aggiungere i punti") }
+            if pannello == .misura { salvaMisura(); pannello = nil; misura = [] } else { misura = []; pannello = .misura; mostra("Tieni premuto sulla mappa per aggiungere i punti") }
         case .squadra: pannello = pannello == .squadra ? nil : .squadra
         case .traccia:
             traccia.attiva.toggle()
@@ -919,6 +966,7 @@ struct MappaTattica: View {
         case .chat: pannello = .chat(nil)
         case .video: pannello = .video(nil)
         case .sos: sosConferma = true
+        case .segnala: pannello = .segnala
         case .triangolazione, .cifrari, .morse, .mirino: attrezzo = .cifrari
         case .qr: attrezzo = .raccolta
         case .offline, .importa, .immagine: pannello = .impostazioni
@@ -1017,7 +1065,7 @@ struct MappaTattica: View {
             case .livelli: PannelloLivelli(ctl: ctl, griglia: $griglia, aree: $mostraAree, squadra: $mostraSquadra, chiudi: chiudi) {
                 ctl.scaricaZona(punti.map(\.coordinate) + DatiEvento.aree.flatMap(\.coordinates) + [location.location?.coordinate].compactMap { $0 })
             }
-            case .misura: PannelloMisura(punti: $misura, chiudi: { misura = []; chiudi() })
+            case .misura: PannelloMisura(punti: $misura, chiudi: { salvaMisura(); misura = []; chiudi() })
             case .info(let id): PannelloInfo(compagno: store.squadra.first { $0.id == id }, chiudi: chiudi)
             case .impostazioni: PannelloImpostazioni(ctl: ctl, griglia: $griglia, aree: $mostraAree, squadra: $mostraSquadra, chiudi: chiudi,
                                                      allinea: { img in carta = img; pannello = nil }) {
@@ -1035,7 +1083,7 @@ struct MappaTattica: View {
             case .salute: PannelloModulo(tipo: .salute, dove: ctl.centro, chiudi: chiudi) { mostra($0) }
             case .pacchetti: PannelloPacchetti(chiudi: chiudi) { mostra($0) }
             case .lora: PannelloLoRa(chiudi: chiudi)
-            case .meteo: PannelloMeteo(dove: location.location?.coordinate ?? ctl.centro, radar: $radar, chiudi: chiudi)
+            case .meteo: PannelloMeteo(dove: ctl.centro, radar: $radar, chiudi: chiudi)
             case .cerca: PannelloCerca(vicino: location.location?.coordinate ?? ctl.centro, chiudi: chiudi) { c, n in
                 ctl.vai(c, zoom: 15); mostra(n)
             }
@@ -1100,7 +1148,7 @@ struct BarraStrumenti: View {
             voce(.strumenti, "square.grid.2x2.fill", "Strumenti", on: attivo == .strumenti, colore: Theme.oliveBright)
             if verticale { Rectangle().fill(Theme.stroke).frame(width: 32, height: 1).padding(.vertical, 2) }
             // solo quello che serve subito sul campo; il resto è in Strumenti
-            voce(.segnala, "exclamationmark.bubble.fill", "Segnala", on: attivo == .segnala, colore: Theme.amber)
+            voce(.livelli, "square.3.layers.3d", "Livelli", on: attivo == .livelli, colore: Theme.amber)
             voce(.squadra, "person.2.fill", "Squadra", on: attivo == .squadra, colore: Theme.cyan)
             voce(.messaggi, "bubble.left.and.bubble.right.fill", "Messaggi", on: chatAperta)
             voce(.video, tx.stato == .open ? "dot.radiowaves.left.and.right" : "video.fill", tx.stato == .open ? "IN ONDA" : "Video",
@@ -1956,61 +2004,7 @@ struct PannelloInfo: View {
 
 // MARK: livelli
 
-struct PannelloLivelli: View {
-    @ObservedObject var ctl: MappaCtl
-    @Binding var griglia: Bool
-    @Binding var aree: Bool
-    @Binding var squadra: Bool
-    var chiudi: () -> Void
-    var scarica: () -> Void
-    @ObservedObject private var volume = VolumeTasti.shared
 
-    var body: some View {
-        VStack(spacing: 0) {
-            TestataPannello(titolo: "Livelli", chiudi: chiudi)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    EtichettaSezione(testo: "Mappa di base")
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                        ForEach(StileMappa.allCases) { s in
-                            Button { haptic(); ctl.stile = s } label: {
-                                VStack(spacing: 6) {
-                                    Image(systemName: s.icona).font(.system(size: 20)).foregroundStyle(ctl.stile == s ? Theme.oliveBright : Theme.dim)
-                                    Text(s.nome).font(.system(size: 12, weight: .bold)).foregroundStyle(.white)
-                                }
-                                .frame(maxWidth: .infinity).frame(height: 62)
-                                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12))
-                                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(ctl.stile == s ? Theme.olive : Theme.stroke, lineWidth: ctl.stile == s ? 2 : 1))
-                            }
-                            .buttonStyle(PressStyle())
-                        }
-                    }
-                    EtichettaSezione(testo: "Sopra la mappa")
-                    Toggle("Griglia MGRS", isOn: $griglia)
-                    Toggle("Aree dell'evento", isOn: $aree)
-                    Toggle("Squadra", isOn: $squadra)
-                    EtichettaSezione(testo: "Tasti volume")
-                    Picker("Tasti volume", selection: $volume.funzione) {
-                        ForEach(VolumeTasti.Funzione.allCases) { Text($0.nome).tag($0) }
-                    }
-                    .pickerStyle(.inline).labelsHidden()
-                    .onChange(of: volume.funzione) { f in if f != .spenti { volume.avvia() } }
-                    EtichettaSezione(testo: "Senza rete")
-                    Button { scarica() } label: {
-                        Label("Scarica la zona dell'evento (\(ctl.stile.nome))", systemImage: "arrow.down.circle.fill").frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent).tint(Theme.olive).foregroundStyle(.black)
-                    .disabled(ctl.offline != nil)
-                    if let o = ctl.offline { ProgressView(value: Double(o.fatti), total: Double(o.totale)).tint(Theme.olive) }
-                    if !ctl.esitoOffline.isEmpty { Text(ctl.esitoOffline).font(.caption).foregroundStyle(Theme.dim) }
-                }
-                .tint(Theme.olive)
-                .font(.system(size: 14))
-                .padding(14)
-            }
-        }
-    }
-}
 
 // MARK: misura
 
@@ -2311,7 +2305,7 @@ struct InfoIsola: View {
 
 /// Fila in alto con gli strumenti scelti dal pannello Strumenti (tenendoli premuti).
 struct BarraRapida: View {
-    @AppStorage("mappa.rapidi") private var rapidi = "distanza,cerchi,meteo"
+    @AppStorage("mappa.rapidi") private var rapidi = "segnala,distanza,cerchi,meteo"
     var usa: (Strumento) -> Void
     var aggiungi: () -> Void
 
@@ -2346,7 +2340,7 @@ struct BarraRapida: View {
     }
 
     static var elenco: [String] {
-        (UserDefaults.standard.string(forKey: "mappa.rapidi") ?? "distanza,cerchi,meteo").split(separator: ",").map(String.init)
+        (UserDefaults.standard.string(forKey: "mappa.rapidi") ?? "segnala,distanza,cerchi,meteo").split(separator: ",").map(String.init)
     }
     static func contiene(_ s: Strumento) -> Bool { elenco.contains(s.rawValue) }
     static func metti(_ s: Strumento) {

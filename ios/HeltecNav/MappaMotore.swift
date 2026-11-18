@@ -103,6 +103,8 @@ final class MappaCtl: ObservableObject {
     @Published var modo: MLNUserTrackingMode = .none
     var segui: Bool { modo != .none }
     var segni: [SegnoMappa] = []
+    /// disegni, cerchi, misure, rotta, traccia: disegnati dal motore della mappa (stesi a terra anche in 3D)
+    var disegniMappa: [ElementoLivello] = []
     var voleRilievo = true
     var voleRadar: String?
     var immaginiFatte = Set<String>()
@@ -340,6 +342,7 @@ struct MappaLibre: UIViewRepresentable {
                 self.parent.ctl.immaginiFatte = []
                 MappeImportate.shared.applica(m)
                 self.parent.ctl.livelliExtra(rilievo: self.parent.ctl.voleRilievo, radar: self.parent.ctl.voleRadar)
+                self.parent.ctl.applicaDisegniLibre()
                 self.parent.ctl.applicaSegni()
                 self.parent.ctl.aggiornaDaMappa()
             }

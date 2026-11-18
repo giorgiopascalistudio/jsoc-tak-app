@@ -306,7 +306,7 @@ enum Strumento: String, CaseIterable, Identifiable {
     case vaiPunto, seguiCompagno, traccia, rotta
     case distanza, proietta, triangolazione, cerchi, vista, profilo
     case punto, linea, area, freccia, testo, recinto, simboli
-    case chat, video, sos, noveRighe, salute, pacchetti
+    case chat, video, sos, noveRighe, salute, pacchetti, segnala
     case cifrari, morse, qr, mirino
     case offline, griglia, importa, immagine, lora
     case cerca, vista360, balistica, replay, cronologia, muroVideo, sms, medico, meteo, rilievo, telecamere, stampa, droni
@@ -318,7 +318,7 @@ enum Strumento: String, CaseIterable, Identifiable {
         case .vaiPunto, .seguiCompagno, .traccia, .rotta: return "Navigazione"
         case .distanza, .proietta, .triangolazione, .cerchi, .vista, .profilo: return "Misure"
         case .punto, .linea, .area, .freccia, .testo, .recinto, .simboli: return "Disegno"
-        case .chat, .video, .sos, .noveRighe, .salute, .pacchetti: return "Squadra"
+        case .chat, .video, .sos, .noveRighe, .salute, .pacchetti, .segnala: return "Squadra"
         case .cifrari, .morse, .qr, .mirino: return "Intelligence"
         case .offline, .griglia, .importa, .immagine, .lora: return "Mappe e rete"
         case .cerca: return "Navigazione"
@@ -350,6 +350,7 @@ enum Strumento: String, CaseIterable, Identifiable {
         case .chat: return "Chat"
         case .video: return "Video"
         case .sos: return "SOS"
+        case .segnala: return "Segnala"
         case .noveRighe: return "Soccorso 9 righe"
         case .salute: return "Report SALUTE"
         case .pacchetti: return "Pacchetti missione"
@@ -400,6 +401,7 @@ enum Strumento: String, CaseIterable, Identifiable {
         case .chat: return "bubble.left.and.bubble.right.fill"
         case .video: return "video.fill"
         case .sos: return "sos"
+        case .segnala: return "exclamationmark.bubble.fill"
         case .noveRighe: return "cross.case.fill"
         case .salute: return "doc.text.magnifyingglass"
         case .pacchetti: return "shippingbox.fill"

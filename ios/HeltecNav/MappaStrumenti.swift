@@ -355,6 +355,7 @@ struct PannelloCerchi: View {
                 _ = try await JsocClient.shared.creaDisegno(ev, tipo: "cerchi", [c], testo: "Cerchi", raggi: raggi)
                 await store.aggiorna(JsocClient.shared)
                 avviso("Cerchi condivisi")
+                centro = nil
                 chiudi()
             } catch { avviso("Non condivisi: \(error.localizedDescription)") }
         }
