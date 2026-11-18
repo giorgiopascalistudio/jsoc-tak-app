@@ -13,6 +13,9 @@ struct GiochiCampoView: View {
                 link("Bandiera / dominazione", "tieni premuto per conquistare, vince chi la tiene di più", "flag.fill", Theme.olive) { BandieraView() }
                 link("Nucleare", "due chiavi girate insieme, codice di lancio, annullamento", "atom", Theme.amber) { NucleareView() }
                 link("Guerra informatica", "viola il terminale ripetendo le sequenze", "cpu", Theme.cyan) { TerminaleView() }
+                link("Disinnesco a cavi", "taglia i cavi nell'ordine giusto prima dello zero", "scissors", Theme.red) { CaviView() }
+                link("Upload dati", "tieni premuto per caricare: se lasci, perdi terreno", "arrow.up.doc.fill", Theme.cyan) { UploadView() }
+                link("Cassaforte", "combinazione a rotelle con premio dentro", "lock.square.stack.fill", Theme.amber) { CassaforteView() }
             } footer: { Text("Lascia il telefono sul campo come oggetto di scena: lo schermo resta acceso finché il gioco è aperto.") }
         }
         .listaJSOC()

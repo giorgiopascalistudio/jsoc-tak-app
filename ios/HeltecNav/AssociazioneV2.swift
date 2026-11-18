@@ -118,7 +118,7 @@ extension JsocClient {
     func storicoModifiche() async throws -> [JStoricoMod] { try await get("/api/registro-modifiche?area=cassa") }
     func registroPresenze(_ anno: Int) async throws -> JRegistro { try await get("/api/registro-presenze?anno=\(anno)") }
     func appelloEvento(_ ev: Int) async throws -> [JAppello] { try await get("/api/eventi/\(ev)/appello") }
-    func segnaAppello(_ ev: Int, _ u: Int, _ p: Bool?) async throws { let _: JOk = try await send("/api/eventi/\(ev)/appello", "POST", ["utente": u, "presente": p as Any]) }
+    func segnaAppello(_ ev: Int, _ u: Int, _ p: Bool?) async throws { let _: JOk = try await send("/api/eventi/\(ev)/appello", "POST", ["utente": u, "presente": p.map { $0 as Any } ?? NSNull()]) }
     func assemblee() async throws -> [JAssemblea] { try await get("/api/assemblee") }
     func nuovaAssemblea(_ c: [String: Any]) async throws -> JAssemblea { try await send("/api/assemblee", "POST", c) }
     func presenzaAssemblea(_ id: Int, _ c: [String: Any]) async throws -> JAssemblea { try await send("/api/assemblee/\(id)/presenza", "POST", c) }
@@ -1144,8 +1144,8 @@ struct MovimentoSheet: View {
         var c: [String: Any] = ["tipo": tipo, "importo": v, "descrizione": descrizione, "categoria": tipo == "giroconto" ? "giroconto" : categoria,
                                 "conto": conto, "data": f.string(from: data), "natura": natura, "destinazione": destinazione]
         if tipo == "giroconto" { c["conto_a"] = contoA }
-        c["utente"] = socio as Any
-        c["evento"] = evento as Any
+        c["utente"] = socio.map { $0 as Any } ?? NSNull()
+        c["evento"] = evento.map { $0 as Any } ?? NSNull()
         do {
             let m = esistente == nil ? try await JsocClient.shared.nuovoMovimento2(c) : try await JsocClient.shared.modificaMovimento(esistente!.id, c)
             if let img = ricevuta, let jpg = img.ridotta(lato: 1800).jpegData(compressionQuality: 0.75) {
