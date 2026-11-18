@@ -559,8 +559,8 @@ struct InvitoSheet: View {
                     Text("Direttivo").tag("direttivo")
                 }
                 .pickerStyle(.segmented)
-                }
                 .onChange(of: ruolo) { _ in invito = nil }
+                }
                 if let i = invito, let img = QR.immagine(i.link) {
                     Image(uiImage: img).interpolation(.none).resizable().scaledToFit()
                         .padding(14).background(.white, in: RoundedRectangle(cornerRadius: 16))
