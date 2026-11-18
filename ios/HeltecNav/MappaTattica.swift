@@ -94,6 +94,8 @@ struct MappaTattica: View {
     @ObservedObject private var volume = VolumeTasti.shared
     @ObservedObject private var traccia = Traccia.shared
     @State private var selezione: SelezioneMappa?
+    /// colonna dei pulsanti a scomparsa (orizzontale con l'isola): esce con uno swipe da sinistra
+    @State private var barraVisibile = false
     @State private var pannello: PannelloMappa?
     @State private var misura: [CLLocationCoordinate2D] = []
     @State private var nuovoPunto: CoordinataScelta?
@@ -142,10 +144,10 @@ struct MappaTattica: View {
         GeometryReader { g in
             let land = g.size.width > g.size.height
             let ins = margini
-            let lBarra: CGFloat = land ? 66 + ins.left : 0
-            let lPannello: CGFloat = pannello == nil ? 0 : (land ? min(360, (g.size.width - ins.left - ins.right) * 0.42) : 0)
-            // con l'isola dinamica le informazioni stanno nella colonna accanto all'isola: niente barra in alto
+            // con l'isola dinamica: accanto all'isola solo le informazioni, i pulsanti escono con uno swipe dal bordo
             let isola = land && ins.left >= 30
+            let lBarra: CGFloat = land ? (isola && !barraVisibile ? ins.left : 66 + ins.left) : 0
+            let lPannello: CGFloat = pannello == nil ? 0 : (land ? min(360, (g.size.width - ins.left - ins.right) * 0.42) : 0)
             let hStato: CGFloat = isola ? 0 : 30 + (land ? 0 : ins.top)
             let hPannelloV: CGFloat = (!land && pannello != nil) ? g.size.height * 0.46 : 0
             let hBarraV: CGFloat = land ? 0 : 60 + ins.bottom
@@ -160,11 +162,31 @@ struct MappaTattica: View {
                     HStack(spacing: 0) {
                         ZStack(alignment: .leading) {
                             if isola { InfoIsola().frame(width: ins.left) }
-                            BarraStrumenti(verticale: true, attivo: pannello, notte: night.on, impostazioni: isola, azione: barra)
-                                .padding(.leading, ins.left).padding(.bottom, ins.bottom * 0.6)
+                            if !isola || barraVisibile {
+                                BarraStrumenti(verticale: true, attivo: pannello, notte: night.on, impostazioni: isola, azione: barra)
+                                    .padding(.leading, ins.left).padding(.bottom, ins.bottom * 0.6)
+                                    .transition(.move(edge: .leading).combined(with: .opacity))
+                            }
                         }
-                        .frame(width: lBarra)
+                        .frame(width: lBarra, alignment: .leading)
+                        .clipped()
                         .background(vetro)
+                        .overlay(alignment: .trailing) {
+                            // maniglia: ricorda che da qui escono i pulsanti
+                            if isola && !barraVisibile {
+                                Capsule().fill(oliva.opacity(0.7)).frame(width: 4, height: 44).padding(.trailing, 3)
+                                    .allowsHitTesting(false)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                        .simultaneousGesture(DragGesture(minimumDistance: 14).onEnded { v in
+                            guard isola else { return }
+                            if v.translation.width > 28, !barraVisibile {
+                                haptic(); withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) { barraVisibile = true }
+                            } else if v.translation.width < -28, barraVisibile {
+                                withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) { barraVisibile = false }
+                            }
+                        })
                         VStack(spacing: 0) {
                             if !isola { barraStato.padding(.trailing, max(ins.right * 0.6, 26)) }
                             HStack(spacing: 0) {
@@ -175,7 +197,8 @@ struct MappaTattica: View {
                                         .transition(.move(edge: .leading).combined(with: .opacity))
                                 }
                                 if isola {
-                                    comandiOrizzontali(EdgeInsets(top: 0, leading: 0, bottom: max(ins.bottom, 10), trailing: 10))
+                                    // lontano dagli angoli arrotondati dello schermo
+                                    comandiOrizzontali(EdgeInsets(top: 0, leading: 0, bottom: max(ins.bottom, 10) + 6, trailing: 22))
                                 } else {
                                     comandiMappa(EdgeInsets(top: 0, leading: 0, bottom: max(ins.bottom, 10), trailing: 10))
                                 }
@@ -451,6 +474,7 @@ struct MappaTattica: View {
 
     /// Tocco sulla mappa: MapLibre dice quali segnaposti ci sono sotto il dito. Se più d'uno, chiedo quale.
     func toccoMappa(_ p: CGPoint) {
+        if barraVisibile { withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) { barraVisibile = false } }
         if selezione != nil || !scelta.isEmpty { withAnimation(.spring(response: 0.3)) { selezione = nil; scelta = [] }; return }
         if modo != nil, let c = ctl.coordinata(p) { vertice(c); return }
         if let k = ctl.segniSotto(p).first(where: { $0.hasPrefix("w") }), let i = Int(k.dropFirst()), i < telecamere.elenco.count {
@@ -657,6 +681,7 @@ struct MappaTattica: View {
                         .transition(.opacity)
                 }
             }
+            .padding(.top, 6)
             Spacer(minLength: 0)
             if let o = ctl.offline {
                 ProgressView(value: Double(o.fatti), total: Double(o.totale)) {
@@ -2250,6 +2275,8 @@ struct InfoIsola: View {
         let l = location.location
         VStack(spacing: 0) {
             VStack(spacing: 4) {
+                Spacer(minLength: 0)
+                Batteria()
                 TimelineView(.periodic(from: .now, by: 30)) { ctx in
                     Text(ctx.date.formatted(date: .omitted, time: .shortened)).font(Theme.mono(12, .heavy)).foregroundStyle(.white)
                 }
@@ -2260,8 +2287,9 @@ struct InfoIsola: View {
                 .font(Theme.mono(8.5, .heavy)).foregroundStyle(jsoc.online ? Theme.green : Theme.amber)
                 if traccia.attiva { Text("● REC").font(Theme.mono(8.5, .heavy)).foregroundStyle(Theme.red) }
             }
+            .padding(.bottom, 8)
             .frame(maxHeight: .infinity)
-            Color.clear.frame(height: 136)      // l'isola
+            Color.clear.frame(height: 132)      // l'isola
             VStack(spacing: 4) {
                 if let h = location.heading {
                     Text("\(gradi3(h - (location.declinazione ?? 4.6))) \(Mission.cardinale(h))").foregroundStyle(Theme.oliveBright)
@@ -2270,8 +2298,10 @@ struct InfoIsola: View {
                 if let l {
                     Text(String(format: "GPS ±%.0f", l.horizontalAccuracy)).foregroundStyle(l.horizontalAccuracy <= 10 ? Theme.dim : Theme.amber)
                 }
+                Spacer(minLength: 0)
             }
             .font(Theme.mono(10.5, .heavy))
+            .padding(.top, 8)
             .frame(maxHeight: .infinity)
         }
         .lineLimit(1).minimumScaleFactor(0.55)
@@ -2327,5 +2357,41 @@ struct BarraRapida: View {
     }
     static func togli(_ s: Strumento) {
         UserDefaults.standard.set(elenco.filter { $0 != s.rawValue }.joined(separator: ","), forKey: "mappa.rapidi")
+    }
+}
+
+
+/// Livello della batteria del telefono, sopra l'ora.
+struct Batteria: View {
+    @State private var livello = Batteria.leggi()
+    @State private var carica = UIDevice.current.batteryState == .charging || UIDevice.current.batteryState == .full
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Image(systemName: carica ? "battery.100.bolt" : icona).font(.system(size: 11, weight: .semibold))
+            Text("\(livello)%").font(Theme.mono(9.5, .heavy))
+        }
+        .foregroundStyle(livello <= 15 && !carica ? Theme.red : (livello <= 30 && !carica ? Theme.amber : Color.white))
+        .onReceive(NotificationCenter.default.publisher(for: UIDevice.batteryLevelDidChangeNotification)) { _ in livello = Self.leggi() }
+        .onReceive(NotificationCenter.default.publisher(for: UIDevice.batteryStateDidChangeNotification)) { _ in
+            carica = UIDevice.current.batteryState == .charging || UIDevice.current.batteryState == .full
+            livello = Self.leggi()
+        }
+    }
+
+    var icona: String {
+        switch livello {
+        case ..<13: return "battery.0"
+        case ..<38: return "battery.25"
+        case ..<63: return "battery.50"
+        case ..<88: return "battery.75"
+        default: return "battery.100"
+        }
+    }
+
+    static func leggi() -> Int {
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        let l = UIDevice.current.batteryLevel
+        return l < 0 ? 100 : Int((l * 100).rounded())
     }
 }

@@ -31,6 +31,20 @@ struct SegnoMappa: Equatable {
 }
 
 enum DisegnoSegni {
+    static func gruppo(_ n: Int) -> UIImage {
+        let lato: CGFloat = n >= 10 ? 34 : 30
+        return UIGraphicsImageRenderer(size: CGSize(width: lato, height: lato)).image { _ in
+            let r = CGRect(x: 1.5, y: 1.5, width: lato - 3, height: lato - 3)
+            UIColor(Theme.red).withAlphaComponent(0.94).setFill()
+            let p = UIBezierPath(ovalIn: r); p.fill()
+            UIColor.black.setStroke(); p.lineWidth = 1.5; p.stroke()
+            let t = (n >= 60 ? "60+" : "+\(n)") as NSString
+            let att: [NSAttributedString.Key: Any] = [.font: UIFont.monospacedSystemFont(ofSize: 11.5, weight: .heavy), .foregroundColor: UIColor.black]
+            let s = t.size(withAttributes: att)
+            t.draw(at: CGPoint(x: (lato - s.width) / 2, y: (lato - s.height) / 2), withAttributes: att)
+        }
+    }
+
     static let scala = UIScreen.main.scale
 
     static func icona(_ s: SegnoMappa) -> UIImage {
@@ -107,7 +121,7 @@ enum DisegnoSegni {
 }
 
 extension MappaCtl {
-    static let livelliToccabili = ["segni-punti", "segni-compagni"]
+    static let livelliToccabili = ["segni-punti", "segni-punti-g", "segni-gruppi", "segni-compagni"]
 
     /// Aggiorna i segnaposti (solo se cambiano davvero).
     func impostaSegni(_ s: [SegnoMappa]) {
@@ -127,7 +141,7 @@ extension MappaCtl {
                 st.setImage(DisegnoSegni.etichetta(x.etichetta), forName: x.nomeEtichetta); immaginiFatte.insert(x.nomeEtichetta)
             }
         }
-        let feats: [MLNPointFeature] = segni.map { x in
+        func elemento(_ x: SegnoMappa) -> MLNPointFeature {
             let f = MLNPointFeature()
             f.coordinate = x.coord
             f.attributes = ["chiave": x.chiave, "tipo": x.chiave.hasPrefix("c") ? "c" : "p",
@@ -135,21 +149,36 @@ extension MappaCtl {
                             "rot": x.rotazione ?? 0, "prio": x.priorita]
             return f
         }
-        let forma = MLNShapeCollectionFeature(shapes: feats)
-        if let src = st.source(withIdentifier: "segni") as? MLNShapeSource {
-            src.shape = forma
+        // i punti dell'evento si raggruppano quando si toccherebbero; compagni, telecamere ecc. restano sempre visibili
+        let sciolti = MLNShapeCollectionFeature(shapes: segni.filter { !$0.chiave.hasPrefix("p") }.map(elemento))
+        let evento = MLNShapeCollectionFeature(shapes: segni.filter { $0.chiave.hasPrefix("p") }.map(elemento))
+        if let a = st.source(withIdentifier: "segni") as? MLNShapeSource,
+           let b = st.source(withIdentifier: "segni-g") as? MLNShapeSource {
+            a.shape = sciolti
+            b.shape = evento
             return
         }
-        let src = MLNShapeSource(identifier: "segni", shape: forma, options: nil)
+        if st.image(forName: "gruppo-2") == nil {
+            for n in 2...60 { st.setImage(DisegnoSegni.gruppo(n), forName: "gruppo-\(n)") }
+        }
+        let src = MLNShapeSource(identifier: "segni", shape: sciolti, options: nil)
         st.addSource(src)
+        let grp = MLNShapeSource(identifier: "segni-g", shape: evento,
+                                 options: [.clustered: true, .clusterRadius: 30, .maximumZoomLevelForClustering: 17])
+        st.addSource(grp)
 
-        let et = MLNSymbolStyleLayer(identifier: "segni-etichette", source: src)
-        et.iconImageName = NSExpression(forKeyPath: "etichetta")
-        et.iconAnchor = NSExpression(forConstantValue: "left")
-        et.iconOffset = NSExpression(forConstantValue: NSValue(cgVector: CGVector(dx: 13, dy: 0)))
-        et.iconAllowsOverlap = NSExpression(forConstantValue: false)
-        et.symbolSortKey = NSExpression(forKeyPath: "prio")
-        st.addLayer(et)
+        func etichette(_ id: String, _ s: MLNShapeSource, _ filtro: NSPredicate?) {
+            let et = MLNSymbolStyleLayer(identifier: id, source: s)
+            et.predicate = filtro
+            et.iconImageName = NSExpression(forKeyPath: "etichetta")
+            et.iconAnchor = NSExpression(forConstantValue: "left")
+            et.iconOffset = NSExpression(forConstantValue: NSValue(cgVector: CGVector(dx: 13, dy: 0)))
+            et.iconAllowsOverlap = NSExpression(forConstantValue: false)
+            et.symbolSortKey = NSExpression(forKeyPath: "prio")
+            st.addLayer(et)
+        }
+        etichette("segni-etichette", src, nil)
+        etichette("segni-etichette-g", grp, NSPredicate(format: "cluster != YES"))
 
         let pu = MLNSymbolStyleLayer(identifier: "segni-punti", source: src)
         pu.predicate = NSPredicate(format: "tipo == 'p'")
@@ -157,6 +186,21 @@ extension MappaCtl {
         pu.iconAllowsOverlap = NSExpression(forConstantValue: true)
         pu.iconIgnoresPlacement = NSExpression(forConstantValue: true)
         st.addLayer(pu)
+
+        let pg = MLNSymbolStyleLayer(identifier: "segni-punti-g", source: grp)
+        pg.predicate = NSPredicate(format: "cluster != YES")
+        pg.iconImageName = NSExpression(forKeyPath: "icona")
+        pg.iconAllowsOverlap = NSExpression(forConstantValue: true)
+        pg.iconIgnoresPlacement = NSExpression(forConstantValue: true)
+        st.addLayer(pg)
+
+        var gradini: [NSNumber: String] = [:]
+        for n in 3...60 { gradini[NSNumber(value: n)] = "gruppo-\(n)" }
+        let gr = MLNSymbolStyleLayer(identifier: "segni-gruppi", source: grp)
+        gr.predicate = NSPredicate(format: "cluster == YES")
+        gr.iconImageName = NSExpression(format: "mgl_step:from:stops:(point_count, 'gruppo-2', %@)", gradini)
+        gr.iconAllowsOverlap = NSExpression(forConstantValue: true)
+        st.addLayer(gr)
 
         let co = MLNSymbolStyleLayer(identifier: "segni-compagni", source: src)
         co.predicate = NSPredicate(format: "tipo == 'c'")
@@ -174,6 +218,11 @@ extension MappaCtl {
         guard let m = mappa else { return [] }
         let r = CGRect(x: p.x - 24, y: p.y - 24, width: 48, height: 48)
         let f = m.visibleFeatures(in: r, styleLayerIdentifiers: Set(Self.livelliToccabili))
+        // tocco su un gruppo: la mappa si avvicina finché i punti si separano
+        if let g = f.first(where: { $0 is MLNPointFeatureCluster }) {
+            m.setCenter(g.coordinate, zoomLevel: min(m.zoomLevel + 2, 18), animated: true)
+            return []
+        }
         var visti = Set<String>(), out: [String] = []
         // dal più vicino al dito
         let ord = f.sorted { a, b in
