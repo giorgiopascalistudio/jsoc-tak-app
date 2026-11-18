@@ -407,8 +407,7 @@ struct EntraView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
                     .padding(.top, 20)
                 Text("Entra in JSOC TAK").font(.title2.weight(.heavy))
-                Text("Inquadra il QR dell'invito che ti ha dato il direttivo. Server e accesso si configurano da soli.
-Già socio su un altro dispositivo? Profilo → Collega un altro dispositivo.")
+                Text("Inquadra il QR dell'invito che ti ha dato il direttivo. Server e accesso si configurano da soli.\nGià socio su un altro dispositivo? Profilo → Collega un altro dispositivo.")
                     .font(.subheadline).foregroundStyle(Theme.dim).multilineTextAlignment(.center)
                 Card(title: "Invito", icon: "qrcode.viewfinder") {
                     if let inv = invito {
