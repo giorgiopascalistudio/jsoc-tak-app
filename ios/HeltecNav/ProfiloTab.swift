@@ -15,6 +15,7 @@ struct ProfiloTab: View {
     @State private var certificato = Date()
     @State private var haCertificato = false
     @State private var invito = false
+    @State private var collega = false
     @State private var esci = false
 
     var body: some View {
@@ -26,6 +27,7 @@ struct ProfiloTab: View {
             .navigationTitle("Profilo")
         }
         .sheet(isPresented: $invito) { InvitoSheet() }
+        .sheet(isPresented: $collega) { InvitoSheet(dispositivo: true) }
     }
 
     var contenuto: some View {
@@ -85,6 +87,9 @@ struct ProfiloTab: View {
                     Button { invito = true } label: { Label("Invita un nuovo socio (QR)", systemImage: "qrcode") }
                 }
             }
+            Section {
+                Button { collega = true } label: { Label("Collega un altro dispositivo (iPad)", systemImage: "ipad.and.iphone") }
+            } footer: { Text("Mostra un QR: lo inquadri dall'altro dispositivo ed entri con lo stesso profilo.") }
             Section {
                 Button("Esci da questo telefono", role: .destructive) { esci = true }
             }

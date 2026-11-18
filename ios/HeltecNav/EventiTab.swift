@@ -396,6 +396,9 @@ struct EntraView: View {
     @State private var errore: String?
 
     var invito: (String, String)? { JsocClient.leggiInvito(link) }
+    /// QR "Collega un altro dispositivo": stesso socio, niente nome e callsign
+    var dispositivo: Bool { link.contains("d=1") }
+    var manca: Bool { invito == nil || (!dispositivo && (nome.trimmingCharacters(in: .whitespaces).isEmpty || callsign.trimmingCharacters(in: .whitespaces).isEmpty)) }
 
     var body: some View {
         ScrollView {
@@ -404,7 +407,8 @@ struct EntraView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
                     .padding(.top, 20)
                 Text("Entra in JSOC TAK").font(.title2.weight(.heavy))
-                Text("Inquadra il QR dell'invito che ti ha dato il direttivo. Server e accesso si configurano da soli.")
+                Text("Inquadra il QR dell'invito che ti ha dato il direttivo. Server e accesso si configurano da soli.
+Già socio su un altro dispositivo? Profilo → Collega un altro dispositivo.")
                     .font(.subheadline).foregroundStyle(Theme.dim).multilineTextAlignment(.center)
                 Card(title: "Invito", icon: "qrcode.viewfinder") {
                     if let inv = invito {
@@ -419,14 +423,14 @@ struct EntraView: View {
                             .background(Theme.surface2, in: RoundedRectangle(cornerRadius: 10))
                     }
                 }
-                Card(title: "Chi sei", icon: "person.fill") {
+                if !dispositivo { Card(title: "Chi sei", icon: "person.fill") {
                     TextField("Nome e cognome", text: $nome)
                         .padding(10).background(Theme.surface2, in: RoundedRectangle(cornerRadius: 10))
                     TextField("Callsign (es. GREG)", text: $callsign)
                         .textInputAutocapitalization(.characters).autocorrectionDisabled()
                         .font(Theme.mono(15, .bold))
                         .padding(10).background(Theme.surface2, in: RoundedRectangle(cornerRadius: 10))
-                }
+                } }
                 if let errore { ErrorCard(text: errore) }
                 Button {
                     guard let inv = invito else { return }
@@ -445,10 +449,12 @@ struct EntraView: View {
                     HStack { if lavoro { ProgressView().tint(.black) }; Text("Entra") }
                 }
                 .buttonStyle(PrimaryButtonStyle())
-                .disabled(invito == nil || nome.trimmingCharacters(in: .whitespaces).isEmpty || callsign.trimmingCharacters(in: .whitespaces).isEmpty || lavoro)
-                .opacity(invito == nil || nome.isEmpty || callsign.isEmpty ? 0.5 : 1)
+                .disabled(manca || lavoro)
+                .opacity(manca ? 0.5 : 1)
             }
             .padding(16)
+            .frame(maxWidth: 560)
+            .frame(maxWidth: .infinity)
         }
         .onAppear { if !invitoAperto.isEmpty { link = invitoAperto } }
         .onChange(of: invitoAperto) { if !$0.isEmpty { link = $0 } }
@@ -537,6 +543,7 @@ struct NuovoEventoSheet: View {
 
 struct InvitoSheet: View {
     @Environment(\.dismiss) var dismiss
+    var dispositivo = false
     @State private var ruolo = "socio"
     @State private var invito: JInvito?
     @State private var errore: String?
@@ -544,24 +551,29 @@ struct InvitoSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 18) {
+                if dispositivo {
+                    Text("Sull'iPad o sull'altro telefono apri JSOC TAK e inquadra questo QR: entri con il tuo stesso profilo.")
+                        .font(.subheadline).foregroundStyle(Theme.dim).multilineTextAlignment(.center)
+                } else {
                 Picker("Ruolo", selection: $ruolo) {
                     Text("Socio").tag("socio")
                     Text("Direttivo").tag("direttivo")
                 }
                 .pickerStyle(.segmented)
+                }
                 .onChange(of: ruolo) { _ in invito = nil }
                 if let i = invito, let img = QR.immagine(i.link) {
                     Image(uiImage: img).interpolation(.none).resizable().scaledToFit()
                         .padding(14).background(.white, in: RoundedRectangle(cornerRadius: 16))
                         .frame(maxWidth: 300)
                     Text(i.codice).font(Theme.mono(28, .heavy)).tracking(4).foregroundStyle(Theme.olive)
-                    Text("Valido 7 giorni, per una sola persona. Il socio lo inquadra all'apertura di JSOC TAK.")
+                    Text(dispositivo ? "Valido 10 minuti, per un solo dispositivo." : "Valido 7 giorni, per una sola persona. Il socio lo inquadra all'apertura di JSOC TAK.")
                         .font(.caption).foregroundStyle(Theme.dim).multilineTextAlignment(.center)
                     ShareLink(item: i.link) { Label("Condividi il link", systemImage: "square.and.arrow.up") }
                         .buttonStyle(.bordered).tint(Theme.olive)
                 } else {
                     Spacer()
-                    Button { crea() } label: { Label("Crea invito \(ruolo)", systemImage: "qrcode") }
+                    Button { crea() } label: { Label(dispositivo ? "Mostra il QR" : "Crea invito \(ruolo)", systemImage: "qrcode") }
                         .buttonStyle(PrimaryButtonStyle())
                 }
                 if let errore { ErrorCard(text: errore) }
@@ -569,7 +581,8 @@ struct InvitoSheet: View {
             }
             .padding(20)
             .background(Theme.bg.ignoresSafeArea())
-            .navigationTitle("Invita")
+            .task { if dispositivo { crea() } }
+            .navigationTitle(dispositivo ? "Collega dispositivo" : "Invita")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Fine") { dismiss() } } }
         }
@@ -578,7 +591,7 @@ struct InvitoSheet: View {
     func crea() {
         errore = nil
         Task {
-            do { invito = try await JsocClient.shared.invito(ruolo: ruolo) } catch { errore = error.localizedDescription }
+            do { invito = try await (dispositivo ? JsocClient.shared.collegaDispositivo() : JsocClient.shared.invito(ruolo: ruolo)) } catch { errore = error.localizedDescription }
         }
     }
 }

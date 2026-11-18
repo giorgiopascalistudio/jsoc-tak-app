@@ -8,7 +8,7 @@ import SRTHaishinKit
 // MARK: - Impostazioni video (come Larix: server MediaMTX con utente e password OTS)
 
 enum VideoConf {
-    static var host: String { UserDefaults.standard.string(forKey: "video.host") ?? "" }
+    static var host: String { UserDefaults.standard.string(forKey: "video.host") ?? "0.0.0.0" }
     static var callsign: String { UserDefaults.standard.string(forKey: "video.callsign") ?? "GREG" }
     static var utente: String { UserDefaults.standard.string(forKey: "video.utente") ?? callsign }
     static var password: String { Keychain.get("video.pass") ?? "" }
@@ -455,7 +455,7 @@ struct VideoImpostazioni: View {
     @Environment(\.dismiss) var dismiss
     @AppStorage("video.callsign") private var callsign = "GREG"
     @AppStorage("video.utente") private var utente = ""
-    @AppStorage("video.host") private var host = ""
+    @AppStorage("video.host") private var host = "0.0.0.0"
     @State private var password = Keychain.get("video.pass") ?? ""
 
     var body: some View {

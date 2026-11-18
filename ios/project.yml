@@ -37,6 +37,9 @@ targets:
         CFBundleShortVersionString: "4.2"
         CFBundleVersion: "42"
         UILaunchScreen: {}
+        # app a scene: senza questa voce iPadOS 26 la apre in compatibilità (formato iPhone, niente finestre)
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
         CFBundleURLTypes:
           - CFBundleURLName: com.giorgiopascali.jsoctak
             CFBundleURLSchemes: [jsoctak]

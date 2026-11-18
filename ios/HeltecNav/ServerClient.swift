@@ -153,7 +153,7 @@ final class ServerClient: ObservableObject {
             let items = Dictionary((c.queryItems ?? []).map { ($0.name, $0.value ?? "") }, uniquingKeysWith: { a, _ in a })
             guard let tok = items["t"], !tok.isEmpty else { return nil }
             let u = items["u"] ?? ""
-            let t: Target = Target(rawValue: items["n"] ?? "") ?? (u.contains("") ? .pc : .server)
+            let t: Target = Target(rawValue: items["n"] ?? "") ?? (u.contains("0.0.0.0") ? .pc : .server)
             if !u.isEmpty { setURL(u, for: t) }
             setToken(tok, for: t)
             Task { await probe() }

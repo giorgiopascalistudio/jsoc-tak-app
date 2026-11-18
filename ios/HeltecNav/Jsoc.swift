@@ -227,7 +227,7 @@ final class JsocClient: ObservableObject {
         var r = URLRequest(url: url)
         r.httpMethod = "POST"
         r.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        r.httpBody = try JSONSerialization.data(withJSONObject: ["codice": codice, "nome": nome, "callsign": callsign])
+        r.httpBody = try JSONSerialization.data(withJSONObject: ["codice": codice, "nome": nome, "callsign": callsign, "dispositivo": UIDevice.current.model])
         let ris: Risposta = try await esegui(r)
         indirizzo = base
         gettone = ris.gettone
@@ -357,6 +357,8 @@ final class JsocClient: ObservableObject {
     }
 
     func invito(ruolo: String) async throws -> JInvito { try await send("/api/inviti", "POST", ["ruolo": ruolo]) }
+    /// Codice da 10 minuti per aprire lo stesso profilo su un altro iPhone/iPad.
+    func collegaDispositivo() async throws -> JInvito { try await send("/api/dispositivi", "POST", [String: String]()) }
 
     struct Salvate: Decodable { let salvate: Int }
     func inviaPosizioni(_ ev: Int, _ lista: [[String: Double]]) async throws -> Int {
