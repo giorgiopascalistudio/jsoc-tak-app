@@ -112,6 +112,11 @@ struct StrumentiTab: View {
                         voce("lock.open.fill", "Cifrari e decodifiche", "Cesare, Vigenère, Morse, catene") { AnyView(CipherTab()) },
                         voce("qrcode.viewfinder", "Raccolta dal campo", "foto, audio, QR") { AnyView(KitTab()) },
                     ])
+                    EtichettaSezione(testo: "Giochi e missioni")
+                    griglia([
+                        voce("flag.checkered", "Missioni (fasi E)", "fasi, codici, QR, GPS, indizi, rami") { AnyView(MissioniView()) },
+                        voce("flame.fill", "Giochi da campo", "bomba, bandiera, nucleare, terminale") { AnyView(GiochiCampoView()) },
+                    ])
                 }
                 .padding(14)
                 .padding(.bottom, 70)
