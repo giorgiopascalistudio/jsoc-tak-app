@@ -144,7 +144,9 @@ struct MappaTattica: View {
             let ins = margini
             let lBarra: CGFloat = land ? 66 + ins.left : 0
             let lPannello: CGFloat = pannello == nil ? 0 : (land ? min(360, (g.size.width - ins.left - ins.right) * 0.42) : 0)
-            let hStato: CGFloat = 30 + (land ? 0 : ins.top)
+            // con l'isola dinamica le informazioni stanno nella colonna accanto all'isola: niente barra in alto
+            let isola = land && ins.left >= 30
+            let hStato: CGFloat = isola ? 0 : 30 + (land ? 0 : ins.top)
             let hPannelloV: CGFloat = (!land && pannello != nil) ? g.size.height * 0.46 : 0
             let hBarraV: CGFloat = land ? 0 : 60 + ins.bottom
             // zona di mappa davvero visibile (fuori da barre e pannelli)
@@ -156,12 +158,15 @@ struct MappaTattica: View {
 
                 if land {
                     HStack(spacing: 0) {
-                        BarraStrumenti(verticale: true, attivo: pannello, notte: night.on, azione: barra)
-                            .padding(.leading, ins.left).padding(.bottom, ins.bottom * 0.6)
-                            .frame(width: lBarra)
-                            .background(vetro)
+                        ZStack(alignment: .leading) {
+                            if isola { InfoIsola().frame(width: ins.left) }
+                            BarraStrumenti(verticale: true, attivo: pannello, notte: night.on, impostazioni: isola, azione: barra)
+                                .padding(.leading, ins.left).padding(.bottom, ins.bottom * 0.6)
+                        }
+                        .frame(width: lBarra)
+                        .background(vetro)
                         VStack(spacing: 0) {
-                            barraStato.padding(.trailing, max(ins.right * 0.6, 26))
+                            if !isola { barraStato.padding(.trailing, max(ins.right * 0.6, 26)) }
                             HStack(spacing: 0) {
                                 if let p = pannello {
                                     pannelloVista(p).padding(.bottom, ins.bottom)
@@ -169,7 +174,11 @@ struct MappaTattica: View {
                                         .background(vetroPannello)
                                         .transition(.move(edge: .leading).combined(with: .opacity))
                                 }
-                                comandiMappa(EdgeInsets(top: 0, leading: 0, bottom: max(ins.bottom, 10), trailing: 10))
+                                if isola {
+                                    comandiOrizzontali(EdgeInsets(top: 0, leading: 0, bottom: max(ins.bottom, 10), trailing: 10))
+                                } else {
+                                    comandiMappa(EdgeInsets(top: 0, leading: 0, bottom: max(ins.bottom, 10), trailing: 10))
+                                }
                             }
                         }
                     }
@@ -617,6 +626,72 @@ struct MappaTattica: View {
         .animation(.spring(response: 0.3), value: avviso)
     }
 
+    /// Orizzontale: strumenti a scelta in alto, Nord e 3D in alto a destra, coordinate accanto alla scala, posizione in basso a destra.
+    func comandiOrizzontali(_ bordi: EdgeInsets) -> some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .top, spacing: 8) {
+                Spacer(minLength: 0)
+                BarraRapida(usa: strumento) {
+                    pannello = .strumenti
+                    mostra("Tieni premuto uno strumento per metterlo in alto")
+                }
+                Spacer(minLength: 0)
+                VStack(spacing: 8) {
+                    tastoTondo("location.north.fill", Theme.red, rotazione: -ctl.rotazione) { ctl.nordInAlto() }
+                        .accessibilityLabel("Nord in alto")
+                    Button { haptic(); ctl.cambiaTreD() } label: {
+                        Text(ctl.tre_d ? "2D" : "3D").font(Theme.mono(13, .heavy)).foregroundStyle(oliva)
+                            .frame(width: 46, height: 46).background(Color.black.opacity(0.72), in: Circle())
+                            .overlay(Circle().strokeBorder(Theme.stroke))
+                    }
+                }
+            }
+            .padding(.top, 8)
+            .overlay(alignment: .bottom) {
+                if let a = avviso {
+                    Text(a).font(.system(size: 12, weight: .heavy)).foregroundStyle(.white)
+                        .padding(.horizontal, 12).padding(.vertical, 7)
+                        .background(Color.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 11))
+                        .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(olivaChiaro.opacity(0.55)))
+                        .offset(y: 44)
+                        .transition(.opacity)
+                }
+            }
+            Spacer(minLength: 0)
+            if let o = ctl.offline {
+                ProgressView(value: Double(o.fatti), total: Double(o.totale)) {
+                    Text("Scarico la zona: \(o.fatti)/\(o.totale)").font(Theme.mono(10, .bold))
+                }
+                .tint(oliva).padding(8).frame(maxWidth: 320)
+                .background(Color.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 10))
+            }
+            HStack(alignment: .bottom, spacing: 14) {
+                ScalaMappa(metriPerPunto: ctl.metriPerPunto)
+                Text(location.location.map { coordTesto($0.coordinate) } ?? "in attesa del GPS")
+                    .font(Theme.mono(11.5, .heavy)).foregroundStyle(.white)
+                    .shadow(color: .black, radius: 2).lineLimit(1).minimumScaleFactor(0.7)
+                Spacer()
+                Button {
+                    haptic(.medium); ctl.cicloModo()
+                    mostra(ctl.modo == .follow ? "Ti seguo · nord in alto" : (ctl.modo == .followWithHeading ? "Ti seguo · orientata sulla tua direzione" : "Mappa libera"))
+                } label: {
+                    Image(systemName: ctl.modo == .followWithHeading ? "location.north.line.fill" : (ctl.modo == .follow ? "location.fill" : "location"))
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(ctl.modo == .none ? Color.white : Color.black)
+                        .frame(width: 50, height: 50)
+                        .background(ctl.modo == .none ? Color.black.opacity(0.55) : olivaChiaro, in: Circle())
+                        .overlay(Circle().strokeBorder(Color.white.opacity(ctl.modo == .none ? 0.95 : 0), lineWidth: 2))
+                        .shadow(color: .black.opacity(0.45), radius: 6, y: 3)
+                }
+                .accessibilityLabel("Segui la mia posizione")
+            }
+            .padding(.leading, 12)
+            .padding(.bottom, bordi.bottom)
+        }
+        .padding(.trailing, bordi.trailing)
+        .animation(.spring(response: 0.3), value: avviso)
+    }
+
     func tastoTondo(_ icona: String, _ colore: Color, rotazione: Double = 0, _ f: @escaping () -> Void) -> some View {
         Button { haptic(); f() } label: {
             Image(systemName: icona).font(.system(size: 18, weight: .bold)).foregroundStyle(colore)
@@ -742,6 +817,7 @@ struct MappaTattica: View {
         haptic()
         switch v {
         case .esci: vaiAllaScheda(Schede.home)
+        case .impostazioni: pannello = pannello == .impostazioni ? nil : .impostazioni
         case .notte: withAnimation(.easeInOut(duration: 0.25)) { night.toggle() }
         case .punto: pannello = .nuovoPunto(ctl.centro.latitude, ctl.centro.longitude)
         case .misura:
@@ -984,15 +1060,17 @@ func ruotaSchermo(_ m: UIInterfaceOrientationMask) {
 // MARK: - Barra strumenti (sinistra in orizzontale, in basso in verticale)
 
 struct BarraStrumenti: View {
-    enum Voce: CaseIterable { case esci, strumenti, segnala, squadra, messaggi, video, notte, sos, punto, misura, traccia, livelli }
+    enum Voce: CaseIterable { case esci, strumenti, segnala, squadra, messaggi, video, notte, impostazioni, sos, punto, misura, traccia, livelli }
     let verticale: Bool
     let attivo: PannelloMappa?
     let notte: Bool
+    /// in orizzontale con l'isola le impostazioni stanno qui, sotto Notte
+    var impostazioni = false
     var azione: (Voce) -> Void
     @ObservedObject private var tx = Trasmissione.shared
 
     var body: some View {
-        let layout = verticale ? AnyLayout(VStackLayout(spacing: 4)) : AnyLayout(HStackLayout(spacing: 0))
+        let layout = verticale ? AnyLayout(VStackLayout(spacing: impostazioni ? 1 : 4)) : AnyLayout(HStackLayout(spacing: 0))
         layout {
             voce(.strumenti, "square.grid.2x2.fill", "Strumenti", on: attivo == .strumenti, colore: Theme.oliveBright)
             if verticale { Rectangle().fill(Theme.stroke).frame(width: 32, height: 1).padding(.vertical, 2) }
@@ -1003,6 +1081,9 @@ struct BarraStrumenti: View {
             voce(.video, tx.stato == .open ? "dot.radiowaves.left.and.right" : "video.fill", tx.stato == .open ? "IN ONDA" : "Video",
                  on: videoAperto, colore: tx.stato == .open ? Theme.red : Theme.olive)
             voce(.notte, notte ? "moon.fill" : "moon", "Notte", on: notte, colore: notte ? Night.red : Theme.dim)
+            if verticale && impostazioni {
+                voce(.impostazioni, attivo == .impostazioni ? "gearshape.fill" : "gearshape", "Mappa", on: attivo == .impostazioni, colore: Theme.oliveBright)
+            }
             if verticale { Spacer(minLength: 0) }
             Button { azione(.esci) } label: {
                 VStack(spacing: 1) {
@@ -1347,60 +1428,48 @@ struct MenuRadiale: View {
     let centro: String
     let colore: Color
     let scheda: AnyView
-    private let r: CGFloat = 82
-    /// Il ventaglio è calcolato a mano fotogramma per fotogramma (TimelineView): non dipende dalle animazioni
-    /// di SwiftUI, che venivano assorbite dal movimento della mappa e la Ruota compariva di colpo.
+    private let r: CGFloat = 104          // raggio esterno degli spicchi
+    private let ri: CGFloat = 37          // raggio interno (attorno al pallino centrale)
+    /// apertura disegnata fotogramma per fotogramma: gli spicchi escono uno dopo l'altro ruotando da ore 12
     @State private var inizio = Date()
     @State private var finito = false
-    private let durata = 0.42, scalino = 0.06
+    private let durata = 0.34, scalino = 0.05
 
     var body: some View {
         GeometryReader { g in
             let c = CGPoint(x: g.size.width / 2, y: g.size.height / 2)
+            let ampiezza = 360.0 / Double(max(voci.count, 1))
             TimelineView(.animation(minimumInterval: nil, paused: finito)) { tl in
                 let t = finito ? 10 : tl.date.timeIntervalSince(inizio)
-                let fondo = Self.morbido(t / 0.3)
-                let arco = Self.morbido(t / (durata + scalino * Double(voci.count)))
                 ZStack {
-                    Circle().fill(Color.black.opacity(0.45))
-                        .overlay(Circle().strokeBorder(colore.opacity(0.45), lineWidth: 1.2))
-                        .frame(width: 2 * r + 64, height: 2 * r + 64)
-                        .scaleEffect(0.3 + 0.7 * fondo)
-                        .opacity(fondo)
-                        .position(c)
-                    // spicchio che si apre a ventaglio dietro ai pulsanti
-                    Spicchio(fine: 360 * arco)
-                        .fill(colore.opacity(0.16))
-                        .frame(width: 2 * r + 64, height: 2 * r + 64)
-                        .position(c)
-                    Text(centro).font(Theme.mono(14, .heavy)).foregroundStyle(.black)
-                        .frame(width: 58, height: 58)
-                        .background(colore.opacity(0.9), in: Circle())
-                        .overlay(Circle().stroke(.white, lineWidth: 3))
-                        .scaleEffect(0.6 + 0.4 * fondo)
-                        .position(c)
                     ForEach(Array(voci.enumerated()), id: \.element.id) { i, v in
                         let k = Self.molla((t - scalino * Double(i)) / durata)
-                        let a = (-90 + (angolo(i) + 90) * min(k, 1)) * .pi / 180
-                        let raggio = r * CGFloat(0.2 + 0.8 * k)
-                        BottoneRadiale(voce: v)
-                            .scaleEffect(0.35 + 0.65 * k)
+                        let da = -90 - ampiezza / 2 + Double(i) * ampiezza + 1.6
+                        SpicchioRuota(voce: v, da: da, a: da + ampiezza - 3.2, ri: ri, ro: r, centro: c)
+                            .rotationEffect(.degrees(-50 * (1 - min(k, 1))))
+                            .scaleEffect(0.5 + 0.5 * k)
                             .opacity(min(1, k * 2.5))
-                            .position(x: c.x + raggio * CGFloat(cos(a)), y: c.y + raggio * CGFloat(sin(a)))
                     }
+                    let f = Self.morbido(t / 0.2)
+                    Text(centro).font(Theme.mono(14, .heavy)).foregroundStyle(.black)
+                        .lineLimit(1).minimumScaleFactor(0.6).padding(4)
+                        .frame(width: 62, height: 62)
+                        .background(colore, in: Circle())
+                        .overlay(Circle().stroke(.white, lineWidth: 3))
+                        .shadow(color: .black.opacity(0.5), radius: 6)
+                        .scaleEffect(0.5 + 0.5 * f).opacity(f)
+                        .position(c)
                     scheda.frame(width: 230).position(posizioneScheda(c, g.size.width))
-                        .opacity(Self.morbido((t - 0.2) / 0.25))
+                        .opacity(Self.morbido((t - 0.2) / 0.22))
                 }
             }
         }
         .onAppear {
             inizio = Date(); finito = false
             haptic(.light)
-            DispatchQueue.main.asyncAfter(deadline: .now() + durata + scalino * Double(voci.count) + 0.6) { finito = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + durata + scalino * Double(voci.count) + 0.5) { finito = true }
         }
     }
-
-    func angolo(_ i: Int) -> Double { -90 + Double(i) * 360 / Double(max(voci.count, 1)) }
 
     /// 0→1 con frenata dolce
     static func morbido(_ x: Double) -> Double { let v = min(max(x, 0), 1); return 1 - pow(1 - v, 3) }
@@ -1413,7 +1482,7 @@ struct MenuRadiale: View {
     }
 
     func posizioneScheda(_ c: CGPoint, _ larghezza: CGFloat) -> CGPoint {
-        let distanza: CGFloat = r + 32 + 135
+        let distanza: CGFloat = r + 22 + 135
         if larghezza - c.x > 290 { return CGPoint(x: c.x + distanza, y: c.y) }
         return CGPoint(x: max(125, c.x - distanza), y: c.y)
     }
@@ -2118,5 +2187,145 @@ struct Spicchio: Shape {
         p.addArc(center: c, radius: r.width / 2, startAngle: .degrees(-90), endAngle: .degrees(-90 + fine), clockwise: false)
         p.closeSubpath()
         return p
+    }
+}
+
+
+/// Uno spicchio della Ruota: settore di corona circolare con icona e nome, si tocca solo dentro la sua forma.
+struct SpicchioRuota: View {
+    let voce: VoceRadiale
+    let da: Double
+    let a: Double
+    let ri: CGFloat
+    let ro: CGFloat
+    let centro: CGPoint
+
+    var body: some View {
+        let forma = SettoreAnello(da: da, a: a, ri: ri, ro: ro, centro: centro)
+        let m = (da + a) / 2 * .pi / 180
+        let rm = (ri + ro) / 2 + 3
+        let p = CGPoint(x: centro.x + rm * CGFloat(cos(m)), y: centro.y + rm * CGFloat(sin(m)))
+        let rosso = voce.testo == "Elimina"
+        Button { haptic(.medium); voce.azione() } label: {
+            ZStack {
+                forma.fill(rosso ? Color(red: 0.32, green: 0.08, blue: 0.06).opacity(0.86) : Color(red: 0.04, green: 0.05, blue: 0.03).opacity(0.84))
+                forma.stroke(voce.colore.opacity(0.6), lineWidth: 1.2)
+                VStack(spacing: 2) {
+                    Image(systemName: voce.icona).font(.system(size: 17, weight: .bold)).foregroundStyle(voce.colore)
+                    Text(voce.testo).font(.system(size: 9.5, weight: .bold)).foregroundStyle(.white)
+                        .lineLimit(1).minimumScaleFactor(0.7)
+                }
+                .frame(width: 62)
+                .position(p)
+            }
+            .contentShape(forma)
+        }
+        .buttonStyle(PressStyle())
+    }
+}
+
+struct SettoreAnello: Shape {
+    let da: Double
+    let a: Double
+    let ri: CGFloat
+    let ro: CGFloat
+    let centro: CGPoint
+
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.addArc(center: centro, radius: ro, startAngle: .degrees(da), endAngle: .degrees(a), clockwise: false)
+        p.addArc(center: centro, radius: ri, startAngle: .degrees(a), endAngle: .degrees(da), clockwise: true)
+        p.closeSubpath()
+        return p
+    }
+}
+
+/// Colonna accanto all'isola dinamica: ora e collegamento sopra, direzione/quota/GPS sotto.
+struct InfoIsola: View {
+    @EnvironmentObject var location: LocationService
+    @ObservedObject private var jsoc = JsocClient.shared
+    @ObservedObject private var traccia = Traccia.shared
+
+    var body: some View {
+        let l = location.location
+        VStack(spacing: 0) {
+            VStack(spacing: 4) {
+                TimelineView(.periodic(from: .now, by: 30)) { ctx in
+                    Text(ctx.date.formatted(date: .omitted, time: .shortened)).font(Theme.mono(12, .heavy)).foregroundStyle(.white)
+                }
+                HStack(spacing: 3) {
+                    Circle().fill(jsoc.online ? Theme.green : Theme.amber).frame(width: 6, height: 6)
+                    Text(jsoc.online ? "ONLINE" : "OFFLINE")
+                }
+                .font(Theme.mono(8.5, .heavy)).foregroundStyle(jsoc.online ? Theme.green : Theme.amber)
+                if traccia.attiva { Text("● REC").font(Theme.mono(8.5, .heavy)).foregroundStyle(Theme.red) }
+            }
+            .frame(maxHeight: .infinity)
+            Color.clear.frame(height: 136)      // l'isola
+            VStack(spacing: 4) {
+                if let h = location.heading {
+                    Text("\(gradi3(h - (location.declinazione ?? 4.6))) \(Mission.cardinale(h))").foregroundStyle(Theme.oliveBright)
+                }
+                if let l, l.verticalAccuracy > 0 { Text(String(format: "%.0f m", l.altitude)).foregroundStyle(Theme.dim) }
+                if let l {
+                    Text(String(format: "GPS ±%.0f", l.horizontalAccuracy)).foregroundStyle(l.horizontalAccuracy <= 10 ? Theme.dim : Theme.amber)
+                }
+            }
+            .font(Theme.mono(10.5, .heavy))
+            .frame(maxHeight: .infinity)
+        }
+        .lineLimit(1).minimumScaleFactor(0.55)
+        .padding(.horizontal, 3)
+    }
+}
+
+/// Fila in alto con gli strumenti scelti dal pannello Strumenti (tenendoli premuti).
+struct BarraRapida: View {
+    @AppStorage("mappa.rapidi") private var rapidi = "distanza,cerchi,meteo"
+    var usa: (Strumento) -> Void
+    var aggiungi: () -> Void
+
+    var body: some View {
+        let lista = rapidi.split(separator: ",").compactMap { Strumento(rawValue: String($0)) }
+        HStack(spacing: 8) {
+            ForEach(lista) { s in
+                Button { haptic(); usa(s) } label: {
+                    VStack(spacing: 2) {
+                        Image(systemName: s.icona).font(.system(size: 15, weight: .bold)).foregroundStyle(s == .sos ? Theme.red : Theme.oliveBright)
+                        Text(String(s.nome.split(separator: " ").first ?? "")).font(.system(size: 8, weight: .bold)).foregroundStyle(.white)
+                            .lineLimit(1).minimumScaleFactor(0.6)
+                    }
+                    .frame(width: 46, height: 42)
+                    .background(Color.black.opacity(0.62), in: RoundedRectangle(cornerRadius: 11))
+                    .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(Theme.stroke))
+                }
+                .buttonStyle(PressStyle())
+                .contextMenu {
+                    Button(role: .destructive) { BarraRapida.togli(s) } label: { Label("Togli dalla barra", systemImage: "pin.slash") }
+                }
+            }
+            if lista.count < 8 {
+                Button { haptic(); aggiungi() } label: {
+                    Image(systemName: "plus").font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.dim)
+                        .frame(width: 42, height: 42)
+                        .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(Theme.olive.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
+                }
+                .accessibilityLabel("Aggiungi uno strumento alla barra")
+            }
+        }
+    }
+
+    static var elenco: [String] {
+        (UserDefaults.standard.string(forKey: "mappa.rapidi") ?? "distanza,cerchi,meteo").split(separator: ",").map(String.init)
+    }
+    static func contiene(_ s: Strumento) -> Bool { elenco.contains(s.rawValue) }
+    static func metti(_ s: Strumento) {
+        var e = elenco
+        guard !e.contains(s.rawValue), e.count < 8 else { return }
+        e.append(s.rawValue)
+        UserDefaults.standard.set(e.joined(separator: ","), forKey: "mappa.rapidi")
+    }
+    static func togli(_ s: Strumento) {
+        UserDefaults.standard.set(elenco.filter { $0 != s.rawValue }.joined(separator: ","), forKey: "mappa.rapidi")
     }
 }

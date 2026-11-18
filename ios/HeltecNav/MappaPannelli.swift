@@ -439,7 +439,7 @@ struct PannelloStrumenti: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            TestataPannello(titolo: "Strumenti", sotto: "\(Strumento.allCases.filter(\.pronto).count) pronti · \(Strumento.allCases.filter { !$0.pronto }.count) in arrivo", chiudi: chiudi)
+            TestataPannello(titolo: "Strumenti", sotto: "Tieni premuto uno strumento per metterlo nella barra in alto", chiudi: chiudi)
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     ForEach(Strumento.categorie, id: \.self) { cat in
@@ -450,6 +450,13 @@ struct PannelloStrumenti: View {
                                     Button { if s.pronto { haptic(); azione(s) } } label: { tessera(s) }
                                         .buttonStyle(PressStyle())
                                         .disabled(!s.pronto)
+                                        .contextMenu {
+                                            if BarraRapida.contiene(s) {
+                                                Button(role: .destructive) { BarraRapida.togli(s) } label: { Label("Togli dalla barra in alto", systemImage: "pin.slash") }
+                                            } else {
+                                                Button { BarraRapida.metti(s) } label: { Label("Metti nella barra in alto", systemImage: "pin") }
+                                            }
+                                        }
                                 }
                             }
                         }

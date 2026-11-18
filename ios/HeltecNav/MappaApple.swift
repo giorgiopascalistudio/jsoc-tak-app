@@ -16,7 +16,6 @@ final class SegnoAppleView: MKAnnotationView {
     override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
         super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
         addSubview(icona); addSubview(etichetta)
-        collisionMode = .circle
     }
     required init?(coder: NSCoder) { fatalError() }
 
@@ -24,10 +23,14 @@ final class SegnoAppleView: MKAnnotationView {
         let i = DisegnoSegni.icona(s), e = DisegnoSegni.etichetta(s.etichetta)
         icona.image = i
         etichetta.image = e
-        frame = CGRect(x: 0, y: 0, width: i.size.width, height: i.size.height)
-        icona.frame = bounds
-        etichetta.frame = CGRect(x: i.size.width - 4, y: (i.size.height - e.size.height) / 2, width: e.size.width, height: e.size.height)
+        let w = i.size.width - 4 + e.size.width
+        frame = CGRect(x: 0, y: 0, width: w, height: max(i.size.height, e.size.height))
+        icona.frame = CGRect(x: 0, y: (frame.height - i.size.height) / 2, width: i.size.width, height: i.size.height)
+        etichetta.frame = CGRect(x: i.size.width - 4, y: (frame.height - e.size.height) / 2, width: e.size.width, height: e.size.height)
+        centerOffset = CGPoint(x: (w - i.size.width) / 2, y: 0)        // l'icona resta sul punto esatto
+        collisionMode = .rectangle
         displayPriority = s.priorita == 0 ? .required : .defaultHigh
+        clusteringIdentifier = s.chiave.hasPrefix("p") ? "punti" : nil
         ruota(s, rotazioneMappa)
     }
 
@@ -51,6 +54,10 @@ struct MappaApple: UIViewRepresentable {
         m.showsScale = false
         m.overrideUserInterfaceStyle = .dark
         m.register(SegnoAppleView.self, forAnnotationViewWithReuseIdentifier: "segno")
+        m.register(GruppoAppleView.self, forAnnotationViewWithReuseIdentifier: "gruppo")
+        m.register(ConoAppleView.self, forAnnotationViewWithReuseIdentifier: "io")
+        context.coordinator.mappa = m
+        context.coordinator.avviaBussola()
         let c = ctl.centro
         m.setRegion(MKCoordinateRegion(center: c, latitudinalMeters: 1500, longitudinalMeters: 1500), animated: false)
         let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coord.tocca(_:)))
@@ -70,13 +77,46 @@ struct MappaApple: UIViewRepresentable {
         Task { @MainActor in if coordinator.parent.ctl.mk === m { coordinator.parent.ctl.mk = nil } }
     }
 
-    final class Coord: NSObject, MKMapViewDelegate {
+    final class Coord: NSObject, MKMapViewDelegate, CLLocationManagerDelegate {
         var parent: MappaApple
+        weak var mappa: MKMapView?
+        private let bussola = CLLocationManager()
+        private var direzione: Double?
         init(_ p: MappaApple) { parent = p }
+        deinit { bussola.stopUpdatingHeading() }
+
+        func avviaBussola() {
+            guard CLLocationManager.headingAvailable() else { return }
+            bussola.delegate = self
+            bussola.headingFilter = 2
+            bussola.startUpdatingHeading()
+        }
+
+        func locationManager(_ manager: CLLocationManager, didUpdateHeading h: CLHeading) {
+            // la bussola va riferita a come è girato lo schermo (in orizzontale ruota di 90°)
+            let o = mappa?.window?.windowScene?.interfaceOrientation
+            let dev: CLDeviceOrientation = o == .landscapeLeft ? .landscapeRight : (o == .landscapeRight ? .landscapeLeft : (o == .portraitUpsideDown ? .portraitUpsideDown : .portrait))
+            if manager.headingOrientation != dev { manager.headingOrientation = dev }
+            direzione = h.trueHeading >= 0 ? h.trueHeading : h.magneticHeading
+            aggiornaCono()
+        }
+
+        func aggiornaCono() {
+            guard let m = mappa, let v = m.view(for: m.userLocation) as? ConoAppleView else { return }
+            v.dirigi(direzione.map { $0 - m.camera.heading })
+        }
 
         @objc func tocca(_ g: UITapGestureRecognizer) {
             guard let m = g.view as? MKMapView else { return }
             let p = g.location(in: m)
+            // tocco su un gruppo di punti: si avvicina finché si separano
+            for case let gruppo as MKClusterAnnotation in m.annotations {
+                let q = m.convert(gruppo.coordinate, toPointTo: m)
+                if hypot(q.x - p.x, q.y - p.y) < 24 {
+                    m.showAnnotations(gruppo.memberAnnotations, animated: true)
+                    return
+                }
+            }
             parent.tocco(p, m.convert(p, toCoordinateFrom: m))
         }
         @objc func premi(_ g: UILongPressGestureRecognizer) {
@@ -86,7 +126,17 @@ struct MappaApple: UIViewRepresentable {
         }
 
         func mapView(_ m: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
-            guard let a = annotation as? SegnoAnnotation else { return nil }   // la mia posizione: quella di Apple
+            if annotation is MKUserLocation {
+                let v = m.dequeueReusableAnnotationView(withIdentifier: "io", for: annotation) as! ConoAppleView
+                v.dirigi(direzione.map { $0 - m.camera.heading })
+                return v
+            }
+            if let g = annotation as? MKClusterAnnotation {
+                let v = m.dequeueReusableAnnotationView(withIdentifier: "gruppo", for: g) as! GruppoAppleView
+                v.mostra(g.memberAnnotations.count)
+                return v
+            }
+            guard let a = annotation as? SegnoAnnotation else { return nil }
             let v = m.dequeueReusableAnnotationView(withIdentifier: "segno", for: a) as! SegnoAppleView
             v.configura(a.segno, rotazioneMappa: m.camera.heading)
             return v
@@ -97,6 +147,7 @@ struct MappaApple: UIViewRepresentable {
             for a in m.annotations {
                 if let s = a as? SegnoAnnotation, s.segno.rotazione != nil, let v = m.view(for: s) as? SegnoAppleView { v.ruota(s.segno, h) }
             }
+            aggiornaCono()
             Task { @MainActor in self.parent.ctl.aggiornaDaMappa() }
         }
 
@@ -143,4 +194,74 @@ extension MappaCtl {
         .sorted { $0.1 < $1.1 }
         .map(\.0)
     }
+}
+
+
+/// La mia posizione sulla mappa Apple: pallino con il cono della direzione (come sulle altre mappe).
+final class ConoAppleView: MKAnnotationView {
+    private let cono = UIImageView(image: ConoAppleView.immagine)
+    private let punto = UIView()
+
+    override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
+        super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
+        frame = CGRect(x: 0, y: 0, width: 130, height: 130)
+        cono.frame = bounds
+        addSubview(cono)
+        punto.frame = CGRect(x: 56, y: 56, width: 18, height: 18)
+        punto.layer.cornerRadius = 9
+        punto.backgroundColor = UIColor(Theme.olive)
+        punto.layer.borderColor = UIColor.white.cgColor
+        punto.layer.borderWidth = 3
+        punto.layer.shadowColor = UIColor.black.cgColor
+        punto.layer.shadowOpacity = 0.5
+        punto.layer.shadowRadius = 3
+        addSubview(punto)
+        displayPriority = .required
+        zPriority = .max
+        canShowCallout = false
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    func dirigi(_ gradi: Double?) {
+        cono.isHidden = gradi == nil
+        if let g = gradi { cono.transform = CGAffineTransform(rotationAngle: CGFloat(g * .pi / 180)) }
+    }
+
+    static let immagine: UIImage = UIGraphicsImageRenderer(size: CGSize(width: 130, height: 130)).image { ctx in
+        let c = CGPoint(x: 65, y: 65)
+        let p = UIBezierPath()
+        p.move(to: c)
+        p.addArc(withCenter: c, radius: 63, startAngle: (-90 - 30) * .pi / 180, endAngle: (-90 + 30) * .pi / 180, clockwise: true)
+        p.close()
+        ctx.cgContext.addPath(p.cgPath)
+        ctx.cgContext.clip()
+        let col = UIColor(Theme.olive)
+        if let g = CGGradient(colorsSpace: nil, colors: [col.withAlphaComponent(0.8).cgColor, col.withAlphaComponent(0).cgColor] as CFArray, locations: [0, 1]) {
+            ctx.cgContext.drawRadialGradient(g, startCenter: c, startRadius: 0, endCenter: c, endRadius: 63, options: [])
+        }
+    }
+}
+
+/// Punti vicini raggruppati: pallino con il numero; toccandolo la mappa si avvicina.
+final class GruppoAppleView: MKAnnotationView {
+    private let testo = UILabel()
+
+    override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
+        super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
+        frame = CGRect(x: 0, y: 0, width: 30, height: 30)
+        layer.cornerRadius = 15
+        backgroundColor = UIColor(Theme.red).withAlphaComponent(0.92)
+        layer.borderColor = UIColor.black.cgColor
+        layer.borderWidth = 1.5
+        testo.frame = bounds
+        testo.textAlignment = .center
+        testo.font = .monospacedSystemFont(ofSize: 12, weight: .heavy)
+        testo.textColor = .black
+        addSubview(testo)
+        displayPriority = .defaultHigh
+        collisionMode = .circle
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    func mostra(_ n: Int) { testo.text = "+\(n)" }
 }
