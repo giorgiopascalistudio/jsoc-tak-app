@@ -62,6 +62,8 @@ struct PannelloImpostazioni: View {
             TestataPannello(titolo: "Impostazioni e mappe", chiudi: chiudi)
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
+                    Text("JSOC TAK \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "") · versione \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "")")
+                        .font(Theme.mono(10, .bold)).foregroundStyle(Theme.dim)
                     EtichettaSezione(testo: "Mappa")
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)], spacing: 6) {
                         ForEach(StileMappa.allCases) { s in

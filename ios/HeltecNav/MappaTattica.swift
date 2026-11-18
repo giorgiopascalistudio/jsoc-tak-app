@@ -172,7 +172,14 @@ struct MappaTattica: View {
                         }
                         .frame(width: lBarra, alignment: .leading)
                         .clipped()
-                        .background(Color.black, in: ArrotondatoDestra(r: 22))   // nera, con gli angoli verso la mappa arrotondati
+                        .background(Color.black)
+                        .overlay(alignment: .topTrailing) {
+                            // angoli "al contrario": è la mappa ad avere gli angoli arrotondati verso la colonna nera
+                            AngoloInverso(alto: true).fill(Color.black).frame(width: 24, height: 24).offset(x: 24).allowsHitTesting(false)
+                        }
+                        .overlay(alignment: .bottomTrailing) {
+                            AngoloInverso(alto: false).fill(Color.black).frame(width: 24, height: 24).offset(x: 24).allowsHitTesting(false)
+                        }
                         .overlay(alignment: .trailing) {
                             // maniglia: ricorda che da qui escono i pulsanti
                             if isola && !barraVisibile {
@@ -2415,6 +2422,27 @@ struct ArrotondatoDestra: Shape {
         p.addLine(to: CGPoint(x: q.maxX, y: q.maxY - r))
         p.addArc(center: CGPoint(x: q.maxX - r, y: q.maxY - r), radius: r, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false)
         p.addLine(to: CGPoint(x: q.minX, y: q.maxY))
+        p.closeSubpath()
+        return p
+    }
+}
+
+
+/// Riempie l'angolo della mappa accanto alla colonna nera lasciando un arco: la mappa sembra una finestra con gli angoli tondi.
+struct AngoloInverso: Shape {
+    var alto: Bool
+    func path(in q: CGRect) -> Path {
+        var p = Path()
+        let r = q.width
+        if alto {
+            p.move(to: CGPoint(x: q.minX, y: q.minY))
+            p.addLine(to: CGPoint(x: q.minX + r, y: q.minY))
+            p.addArc(center: CGPoint(x: q.minX + r, y: q.minY + r), radius: r, startAngle: .degrees(-90), endAngle: .degrees(180), clockwise: true)
+        } else {
+            p.move(to: CGPoint(x: q.minX, y: q.maxY))
+            p.addLine(to: CGPoint(x: q.minX, y: q.maxY - r))
+            p.addArc(center: CGPoint(x: q.minX + r, y: q.maxY - r), radius: r, startAngle: .degrees(180), endAngle: .degrees(90), clockwise: true)
+        }
         p.closeSubpath()
         return p
     }

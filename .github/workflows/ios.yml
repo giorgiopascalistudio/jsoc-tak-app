@@ -22,6 +22,8 @@ jobs:
       - name: Build unsigned IPA
         working-directory: ios
         run: |
+          # numero di versione progressivo: si legge in Impostazioni mappa
+          sed -i '' "s/CFBundleVersion: \"[0-9]*\"/CFBundleVersion: \"$GITHUB_RUN_NUMBER\"/" project.yml
           xcodegen generate
           xcodebuild -project HeltecNav.xcodeproj -target HeltecNav -configuration Release \
             -sdk iphoneos SYMROOT="$PWD/build" CODE_SIGNING_ALLOWED=NO build > build.log 2>&1 || {
