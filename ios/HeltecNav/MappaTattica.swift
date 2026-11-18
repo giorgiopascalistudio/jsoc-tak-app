@@ -175,10 +175,10 @@ struct MappaTattica: View {
                         .background(Color.black)
                         .overlay(alignment: .topTrailing) {
                             // angoli "al contrario": è la mappa ad avere gli angoli arrotondati verso la colonna nera
-                            AngoloInverso(alto: true).fill(Color.black).frame(width: 24, height: 24).offset(x: 24).allowsHitTesting(false)
+                            AngoloInverso(alto: true).fill(Color.black).frame(width: 52, height: 52).offset(x: 52).allowsHitTesting(false)
                         }
                         .overlay(alignment: .bottomTrailing) {
-                            AngoloInverso(alto: false).fill(Color.black).frame(width: 24, height: 24).offset(x: 24).allowsHitTesting(false)
+                            AngoloInverso(alto: false).fill(Color.black).frame(width: 52, height: 52).offset(x: 52).allowsHitTesting(false)
                         }
                         .overlay(alignment: .trailing) {
                             // maniglia: ricorda che da qui escono i pulsanti

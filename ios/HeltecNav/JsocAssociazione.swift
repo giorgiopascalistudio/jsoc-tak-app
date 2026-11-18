@@ -117,7 +117,7 @@ struct JPresenza: Codable, Identifiable, Hashable {
     let presente: Int?
 }
 struct JPresenze: Codable {
-    struct Conta: Codable, Hashable { let si: Int; let no: Int; let forse: Int; let senza_risposta: Int }
+    struct Conta: Codable, Hashable { let si: Int; let no: Int; let forse: Int; let senza_risposta: Int; var attesa: Int? = nil }
     let presenze: [JPresenza]; let conta: Conta
 }
 
@@ -157,7 +157,7 @@ struct JHome: Codable {
         let mio_ruolo: String?; let mia_risposta: String?; let si: Int
     }
     struct Avviso: Codable, Hashable { let tipo: String; let testo: String; let evento: Int? }
-    struct Direttivo: Codable { let quote_da_incassare: Int?; let saldo: Double?; let certificati_scaduti: Int? }
+    struct Direttivo: Codable { let quote_da_incassare: Int?; let saldo: Double?; let certificati_scaduti: Int?; var proposte: Int? = nil }
     let prossimi: [Prossimo]
     let avvisi: [Avviso]
     let post_nuovi: Int
@@ -188,7 +188,16 @@ extension JsocClient {
     }
     func cancellaMateriale(_ id: Int) async throws { let _: JOk = try await send("/api/materiale/\(id)", "DELETE", [String: Any]()) }
     func presenze(_ ev: Int) async throws -> JPresenze { try await get("/api/eventi/\(ev)/presenze") }
-    func rispondi(_ ev: Int, _ r: String) async throws -> JPresenze { try await send("/api/eventi/\(ev)/presenza", "POST", ["risposta": r]) }
+    func rispondi(_ ev: Int, _ r: String, risposte: [String: String] = [:]) async throws -> JPresenze {
+        try await send("/api/eventi/\(ev)/presenza", "POST", ["risposta": r, "risposte": risposte])
+    }
+    func approvaEvento(_ ev: Int) async throws { let _: JOk = try await send("/api/eventi/\(ev)/approva", "POST", [String: Any]()) }
+    func togliEvento(_ ev: Int) async throws { let _: JOk = try await send("/api/eventi/\(ev)", "DELETE", [String: Any]()) }
+    func promemoria(_ ev: Int) async throws -> Int {
+        struct R: Codable { let quanti: Int? }
+        let r: R = try await send("/api/eventi/\(ev)/promemoria", "POST", [String: Any]())
+        return r.quanti ?? 0
+    }
     func appello(_ ev: Int, utente: Int, presente: Bool) async throws -> JPresenze {
         try await send("/api/eventi/\(ev)/presenze", "POST", ["utente": utente, "presente": presente])
     }

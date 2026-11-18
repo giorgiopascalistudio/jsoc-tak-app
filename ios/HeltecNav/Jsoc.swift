@@ -79,6 +79,18 @@ struct JEvento: Codable, Identifiable, Hashable {
     let archiviato: Int?
     let mio_ruolo: String?
     var mia_risposta: String? = nil
+    // stile Spond (server 0.7)
+    var copertina: String? = nil
+    var interno: Int? = nil
+    var stato: String? = nil
+    var scadenza: String? = nil
+    var posti: Int? = nil
+    var quota: Double? = nil
+    var domande: [String]? = nil
+    var host: String? = nil
+    var n_si: Int? = nil
+    var n_no: Int? = nil
+    var n_attesa: Int? = nil
     var punti: [JPunto]? = nil
     var aree: [JArea]? = nil
     var disegni: [JDisegno]? = nil

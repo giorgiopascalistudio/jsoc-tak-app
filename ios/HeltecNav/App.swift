@@ -23,17 +23,13 @@ struct JsocTakApp: App {
 
     var body: some Scene {
         WindowGroup {
-            TabView(selection: Binding(get: { tab }, set: { if $0 != tab { haptic(.soft) }; tab = $0 })) {
-                HomeTab().tabItem { Label("Home", systemImage: "house.fill") }.tag(Schede.home)
-                    .badge(avvisiHome > 0 ? Text("\(avvisiHome)") : nil)
-                MapTab().tabItem { Label("Mappa", systemImage: "map.fill") }.tag(Schede.mappa)
-                EventiTab().tabItem { Label("Eventi", systemImage: "flag.checkered") }.tag(Schede.eventi)
-                    .badge(evento.nonLetti > 0 ? Text("\(evento.nonLetti)") : nil)
-                AssociazioneTab().tabItem { Label("Associazione", systemImage: "shield.lefthalf.filled") }.tag(Schede.associazione)
-                    .badge((home.dati?.post_nuovi ?? 0) + (home.dati?.sondaggi_aperti ?? 0) > 0
-                           ? Text("\((home.dati?.post_nuovi ?? 0) + (home.dati?.sondaggi_aperti ?? 0))") : nil)
-                ProfiloTab().tabItem { Label("Profilo", systemImage: "person.crop.circle.fill") }.tag(Schede.profilo)
-            }
+            // Home · Eventi · Associazione · Strumenti (barra in basso, colonna a sinistra in orizzontale);
+            // il Profilo si apre dalla Home, la Mappa dagli eventi
+            ContenitoreSchede(tab: $tab, badge: [
+                Schede.home: avvisiHome,
+                Schede.eventi: evento.nonLetti + evento.eventi.filter { $0.fase != 2 && $0.stato != "proposto" && $0.mia_risposta == nil }.count,
+                Schede.associazione: (home.dati?.post_nuovi ?? 0) + (home.dati?.sondaggi_aperti ?? 0),
+            ])
             .tint(night.on ? Night.red : Theme.olive)
             // modalità notturna: tutto moltiplicato per il rosso (il nero resta nero, il bianco diventa rosso)
             .colorMultiply(night.on ? Night.filtro : .white)

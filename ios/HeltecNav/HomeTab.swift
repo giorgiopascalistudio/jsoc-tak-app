@@ -8,7 +8,7 @@ extension Notification.Name {
 
 func vaiAllaScheda(_ i: Int) { NotificationCenter.default.post(name: .vaiTab, object: nil, userInfo: ["tab": i]) }
 
-enum Schede { static let home = 0, mappa = 1, eventi = 2, associazione = 3, profilo = 4 }
+enum Schede { static let home = 0, mappa = 1, eventi = 2, associazione = 3, profilo = 4, strumenti = 5 }
 
 // MARK: - Home (dashboard)
 
