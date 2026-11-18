@@ -85,7 +85,6 @@ extension JsocClient {
     func giudica(_ prova: Int, ok: Bool) async throws { let _: JOk = try await send("/api/prove/\(prova)", "POST", ["ok": ok]) }
 }
 
-struct JOk: Codable { let ok: Bool? }
 
 enum NomiMissione {
     static let prove: [(String, String, String)] = [
