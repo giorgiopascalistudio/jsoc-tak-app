@@ -44,7 +44,7 @@ struct BarraSchede: View {
                 .buttonStyle(PressStyle())
             }
         }
-        .animation(.spring(response: 0.32, dampingFraction: 0.8), value: tab)
+        .animation(ConfigApp.animazioni ? .spring(response: 0.32, dampingFraction: 0.8) : nil, value: tab)
         .padding(4)
         .background(Theme.surface.opacity(0.96), in: RoundedRectangle(cornerRadius: 24))
         .overlay(RoundedRectangle(cornerRadius: 24).strokeBorder(Theme.stroke))
@@ -74,6 +74,7 @@ struct ContenitoreSchede: View {
                 .opacity(mostra ? 1 : 0)
                 .offset(y: mostra || riduci ? 0 : 12)
                 .onChange(of: attiva) { a in
+                    guard ConfigApp.animazioni else { mostra = true; return }
                     if a { withAnimation(.easeOut(duration: 0.24)) { mostra = true } }
                     else { var t = Transaction(); t.disablesAnimations = true; withTransaction(t) { mostra = false } }
                 }

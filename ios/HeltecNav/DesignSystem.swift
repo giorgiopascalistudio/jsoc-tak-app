@@ -102,7 +102,7 @@ func haptic(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .light) {
 struct Reveal: ViewModifier {
     let index: Int
     @Environment(\.accessibilityReduceMotion) var reduce
-    @State private var shown = false
+    @State private var shown = !ConfigApp.animazioni
 
     func body(content: Content) -> some View {
         content
@@ -277,9 +277,14 @@ struct TailscaleBanner: View {
 // MARK: - Comparsa animata delle sezioni
 
 /// Le card entrano una dopo l'altra: salgono, si ingrandiscono e si accendono (indice = ordine di entrata).
+/// interruttori decisi dal server (arrivano con /api/stato all'avvio): si cambiano senza ricompilare
+enum ConfigApp {
+    static var animazioni: Bool { UserDefaults.standard.object(forKey: "cfg.animazioni") as? Bool ?? true }
+}
+
 struct Comparsa: ViewModifier {
     let indice: Int
-    @State private var visibile = false
+    @State private var visibile = !ConfigApp.animazioni
     @Environment(\.accessibilityReduceMotion) private var riduci
 
     func body(content: Content) -> some View {

@@ -219,12 +219,13 @@ final class JsocClient: ObservableObject {
     /// se è diverso da quello con cui siamo entrati, ci passo e tengo il vecchio come strada di riserva.
     func aggiornaIndirizzo() async {
         guard collegato, let u = URL(string: indirizzo + "/api/stato") else { return }
-        struct Stato: Decodable { let indirizzo: String? }
+        struct Stato: Decodable { let indirizzo: String?; var config: [String: Bool]? = nil }
         var r = URLRequest(url: u, timeoutInterval: 10)
         r.cachePolicy = .reloadIgnoringLocalCacheData
         guard let (d, _) = try? await URLSession.shared.data(for: r),
-              let s = try? JSONDecoder().decode(Stato.self, from: d),
-              var nuovo = s.indirizzo, !nuovo.isEmpty else { return }
+              let s = try? JSONDecoder().decode(Stato.self, from: d) else { return }
+        for (k, v) in s.config ?? [:] { UserDefaults.standard.set(v, forKey: "cfg." + k) }
+        guard var nuovo = s.indirizzo, !nuovo.isEmpty else { return }
         if nuovo.hasSuffix("/") { nuovo.removeLast() }
         guard nuovo != indirizzo, let prova = URL(string: nuovo + "/api/stato"),
               let (_, resp) = try? await URLSession.shared.data(for: URLRequest(url: prova, timeoutInterval: 10)),
