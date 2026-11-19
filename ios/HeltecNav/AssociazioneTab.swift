@@ -10,6 +10,7 @@ struct AssociazioneTab: View {
     var direttivo: Bool { jsoc.utente?.direttivo == true }
 
     var body: some View {
+        let _ = Contatori.disegno("AssociazioneTab")
         NavigationStack {
             Group {
                 if jsoc.collegato { contenuto } else { EntraView() }

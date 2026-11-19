@@ -37,6 +37,7 @@ struct MappaHomeBox: View {
     @ObservedObject private var campi = CampiStore.shared
 
     var body: some View {
+        let _ = Contatori.disegno("MappaHomeBox")
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("CAMPI ED EVENTI").font(.system(size: 12, weight: .heavy)).foregroundStyle(Theme.dim)

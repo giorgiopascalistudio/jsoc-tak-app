@@ -15,6 +15,7 @@ struct BarraSchede: View {
                                                (Schede.strumenti, "Strumenti", "square.grid.2x2.fill")]
 
     var body: some View {
+        let _ = Contatori.disegno("BarraSchede")
         let layout = verticale ? AnyLayout(VStackLayout(spacing: 6)) : AnyLayout(HStackLayout(spacing: 2))
         layout {
             ForEach(Self.voci, id: \.0) { v in
@@ -85,6 +86,7 @@ struct ContenitoreSchede: View {
     }
 
     var body: some View {
+        let _ = Contatori.disegno("ContenitoreSchede")
         GeometryReader { g in
             let land = g.size.width > g.size.height
             ZStack {
@@ -136,6 +138,7 @@ struct ContenitoreSchede: View {
 
 struct StrumentiTab: View {
     var body: some View {
+        let _ = Contatori.disegno("StrumentiTab")
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
@@ -280,6 +283,7 @@ struct TesseraData: View {
 struct RigaEventoV2: View {
     let evento: JEvento
     var body: some View {
+        let _ = Contatori.disegno("RigaEventoV2")
         let e = evento
         HStack(spacing: 12) {
             TesseraData(evento: e)
@@ -335,6 +339,7 @@ struct HomeV2: View {
     @State private var profilo = false
 
     var body: some View {
+        let _ = Contatori.disegno("HomeV2")
         NavigationStack(path: $percorso) {
             Group {
                 if jsoc.collegato { contenuto } else { EntraView() }
@@ -538,6 +543,7 @@ struct EventiV2: View {
     @State private var scelto: JEvento?
 
     var body: some View {
+        let _ = Contatori.disegno("EventiV2")
         NavigationStack(path: $percorso) {
             Group {
                 if jsoc.collegato { contenuto } else { EntraView() }
@@ -674,6 +680,7 @@ struct EventoScheda: View {
     var gestore: Bool { jsoc.utente?.direttivo == true || e.staff }
 
     var body: some View {
+        let _ = Contatori.disegno("EventoScheda")
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 CopertinaEvento(evento: e, altezza: 210)

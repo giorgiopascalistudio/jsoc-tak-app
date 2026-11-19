@@ -73,6 +73,16 @@ struct JsocTakApp: App {
             .onAppear {
                 Diagnostica.invia()
                 Prestazioni.shared.avvia()
+                let C = Contatori.shared
+                C.osserva("EventoStore", EventoStore.shared.objectWillChange); C.osserva("HomeModel", HomeModel.shared.objectWillChange)
+                C.osserva("JsocClient", JsocClient.shared.objectWillChange); C.osserva("PermessiStore", PermessiStore.shared.objectWillChange)
+                C.osserva("CampiStore", CampiStore.shared.objectWillChange); C.osserva("Livelli", Livelli.shared.objectWillChange)
+                C.osserva("NavStore", NavStore.shared.objectWillChange); C.osserva("DocAssoc", DocAssoc.shared.objectWillChange)
+                C.osserva("PianiStore", PianiStore.shared.objectWillChange); C.osserva("Traccia", Traccia.shared.objectWillChange)
+                C.osserva("Posizione/bussola", location.objectWillChange); C.osserva("Notte", night.objectWillChange)
+                C.osserva("Missione", mission.objectWillChange); C.osserva("ServerTAK", server.objectWillChange)
+                C.osserva("Documenti", docs.objectWillChange); C.osserva("Claude", claude.objectWillChange)
+                C.osserva("Registro", log.objectWillChange); C.osserva("Rilevamenti", rilevamenti.objectWillChange)
                 Task { await jsoc.aggiornaIndirizzo() }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 15) { Diagnostica.avvioRiuscito() }
                 Avvisi.shared.attiva()

@@ -19,6 +19,7 @@ struct ProfiloTab: View {
     @State private var esci = false
 
     var body: some View {
+        let _ = Contatori.disegno("ProfiloTab")
         NavigationStack {
             Group {
                 if jsoc.collegato { contenuto } else { EntraView() }

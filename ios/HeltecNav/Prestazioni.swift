@@ -1,4 +1,24 @@
 import UIKit
+import Combine
+
+/// contatori senza attore (si chiamano anche dentro i body delle viste): segnali di cambiamento e ridisegni
+final class Contatori {
+    static let shared = Contatori()
+    private let lock = NSLock()
+    private var segnali: [String: Int] = [:]
+    private var disegni: [String: Int] = [:]
+    private var tieni: [AnyCancellable] = []
+
+    static func disegno(_ n: String) { shared.lock.lock(); shared.disegni[n, default: 0] += 1; shared.lock.unlock() }
+    func osserva(_ nome: String, _ p: ObservableObjectPublisher) {
+        let c = p.sink { [weak self] _ in guard let self else { return }; self.lock.lock(); self.segnali[nome, default: 0] += 1; self.lock.unlock() }
+        lock.lock(); tieni.append(c); lock.unlock()
+    }
+    func svuota() -> (segnali: [String: Int], disegni: [String: Int]) {
+        lock.lock(); defer { segnali = [:]; disegni = [:]; lock.unlock() }
+        return (segnali, disegni)
+    }
+}
 
 /// Cronometro delle prestazioni. Un "sorvegliante" su un altro filo chiede ogni 50 ms al filo principale di rispondere:
 /// se tarda più di 80 ms l'app è davvero bloccata (non è il display che rallenta da solo a schermo fermo).
@@ -65,8 +85,11 @@ final class Prestazioni {
     }
 
     private func manda() {
-        guard !blocchi.isEmpty || !cambi.isEmpty || !lente.isEmpty else { return }
-        var righe = ["PRESTAZIONI2 \(Diagnostica.versione) · \(UIDevice.current.model) iOS \(UIDevice.current.systemVersion)"]
+        let c = Contatori.shared.svuota()
+        guard !blocchi.isEmpty || !cambi.isEmpty || !lente.isEmpty || !c.segnali.isEmpty else { return }
+        var righe = ["PRESTAZIONI3 \(Diagnostica.versione) · \(UIDevice.current.model) iOS \(UIDevice.current.systemVersion)"]
+        righe.append("segnali di cambiamento in 30 s: " + c.segnali.sorted { $0.value > $1.value }.map { "\($0.key) \($0.value)" }.joined(separator: ", "))
+        righe.append("ridisegni in 30 s: " + c.disegni.sorted { $0.value > $1.value }.map { "\($0.key) \($0.value)" }.joined(separator: ", "))
         if !cambi.isEmpty { righe.append("cambi sezione: " + cambi.joined(separator: ", ")) }
         for b in blocchi { righe.append("BLOCCO \(Int(b.1)) ms in \(b.0)" + (b.2.isEmpty ? "" : " · durante: \(b.2)")) }
         if !lente.isEmpty { righe.append("lavori lenti: " + lente.joined(separator: " | ")) }

@@ -187,6 +187,7 @@ struct AssociazioneHomeV2: View {
     @State private var soci: [JSocioLibro] = []
 
     var body: some View {
+        let _ = Contatori.disegno("AssociazioneHomeV2")
         ScrollView {
             VStack(spacing: 12) {
                 testata.comparsa(0)
