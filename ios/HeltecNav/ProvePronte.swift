@@ -1306,37 +1306,55 @@ struct DatiInterruttori {
             let a = g.int(0...(n - 1)), b = g.int(0...(n - 1)), c = g.int(0...(n - 1))
             guard a != b else { continue }
             let tipo = g.int(0...(l == .facile ? 3 : 5))
+            let la = L[a], lb = L[b], lc = L[c]
             switch tipo {
             case 0:
-                vincoli.append(sol[a] == sol[b] ? ("\(L[a]) e \(L[b]) sono nella stessa posizione.", { $0[a] == $0[b] }) : ("\(L[a]) e \(L[b]) sono in posizioni opposte.", { $0[a] != $0[b] }))
+                if sol[a] == sol[b] {
+                    let f: ([Bool]) -> Bool = { v in v[a] == v[b] }
+                    vincoli.append(("\(la) e \(lb) sono nella stessa posizione.", f))
+                } else {
+                    let f: ([Bool]) -> Bool = { v in v[a] != v[b] }
+                    vincoli.append(("\(la) e \(lb) sono in posizioni opposte.", f))
+                }
             case 1:
-                let k = sol.filter { $0 }.count
+                let k: Int = sol.filter { $0 }.count
                 if !vincoli.contains(where: { $0.0.hasPrefix("In tutto") }) {
-                    vincoli.append(("In tutto ci sono \(k) interruttori accesi.", { $0.filter { $0 }.count == k }))
+                    let f: ([Bool]) -> Bool = { v in v.filter { $0 }.count == k }
+                    vincoli.append(("In tutto ci sono \(k) interruttori accesi.", f))
                 }
             case 2:
                 if l == .facile || g.vero(0.25) {
-                    vincoli.append(sol[a] ? ("\(L[a]) è acceso.", { $0[a] }) : ("\(L[a]) è spento.", { !$0[a] }))
+                    let acceso: Bool = sol[a]
+                    let f: ([Bool]) -> Bool = { v in v[a] == acceso }
+                    vincoli.append(("\(la) è \(acceso ? "acceso" : "spento").", f))
                 }
             case 3:
-                // implicazione vera nella soluzione
-                if sol[a] { vincoli.append(sol[b] ? ("Se \(L[a]) è acceso, anche \(L[b]) è acceso.", { !$0[a] || $0[b] }) : ("Se \(L[a]) è acceso, \(L[b]) è spento.", { !$0[a] || !$0[b] })) }
-                else { vincoli.append(sol[b] ? ("Se \(L[a]) è spento, \(L[b]) è acceso.", { $0[a] || $0[b] }) : ("Se \(L[a]) è spento, anche \(L[b]) è spento.", { $0[a] || !$0[b] })) }
+                // implicazione vera nella soluzione: se A è (com'è) allora B è (com'è)
+                let sa: Bool = sol[a], sb: Bool = sol[b]
+                let f: ([Bool]) -> Bool = { v in v[a] != sa || v[b] == sb }
+                let testo = "Se \(la) è \(sa ? "acceso" : "spento"), \(lb) è \(sb ? "acceso" : "spento")."
+                vincoli.append((testo, f))
             case 4:
                 guard c != a, c != b else { continue }
-                let k = [sol[a], sol[b], sol[c]].filter { $0 }.count
-                let t = k == 0 ? "nessuno è acceso" : (k == 1 ? "uno solo è acceso" : (k == 2 ? "due sono accesi" : "sono tutti accesi"))
-                vincoli.append(("Tra \(L[a]), \(L[b]) e \(L[c]) \(t).", { [$0[a], $0[b], $0[c]].filter { $0 }.count == k }))
+                let k: Int = [sol[a], sol[b], sol[c]].filter { $0 }.count
+                let nomi = ["nessuno è acceso", "uno solo è acceso", "due sono accesi", "sono tutti accesi"]
+                let f: ([Bool]) -> Bool = { v in [v[a], v[b], v[c]].filter { $0 }.count == k }
+                vincoli.append(("Tra \(la), \(lb) e \(lc) \(nomi[k]).", f))
             default:
-                let k = (0..<n).filter { $0 < a && sol[$0] }.count
-                if a > 0 { vincoli.append(("Prima di \(L[a]) (a sinistra) ci sono \(k) interruttori accesi.", { v in (0..<a).filter { v[$0] }.count == k })) }
+                if a > 0 {
+                    let k: Int = (0..<a).filter { sol[$0] }.count
+                    let f: ([Bool]) -> Bool = { v in (0..<a).filter { v[$0] }.count == k }
+                    vincoli.append(("Prima di \(la) (a sinistra) ci sono \(k) interruttori accesi.", f))
+                }
             }
         }
         // se dopo tanti giri non è ancora unica, chiudo con indizi diretti
         var i = 0
         while soluzioni() != 1 && i < n {
             let j = i
-            vincoli.append(sol[j] ? ("\(L[j]) è acceso.", { $0[j] }) : ("\(L[j]) è spento.", { !$0[j] }))
+            let acceso: Bool = sol[j]
+            let f: ([Bool]) -> Bool = { v in v[j] == acceso }
+            vincoli.append(("\(L[j]) è \(acceso ? "acceso" : "spento").", f))
             i += 1
         }
         self.n = n; soluzione = sol
