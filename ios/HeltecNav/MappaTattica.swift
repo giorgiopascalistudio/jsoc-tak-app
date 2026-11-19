@@ -158,7 +158,8 @@ struct MappaTattica: View {
             // iPad: barra degli strumenti fissa a sinistra (anche in verticale), barra di stato sempre in alto,
             // niente colonna informazioni né scorrimento: lo schermo è grande
             let pad = UIDevice.current.userInterfaceIdiom == .pad
-            let veraIsola = ins.left >= 30
+            // su iPadOS 26 il margine sinistro può essere quello dei comandi della finestra: non è un'isola
+            let veraIsola = ins.left >= 30 && !pad
             let colonna: CGFloat = veraIsola ? ins.left : 0
             let isola = land && veraIsola
             let lBarra: CGFloat = land ? (isola && !barraVisibile ? colonna : 66 + colonna) : 0

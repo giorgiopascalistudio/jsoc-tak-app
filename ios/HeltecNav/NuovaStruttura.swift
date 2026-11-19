@@ -64,11 +64,19 @@ struct ContenitoreSchede: View {
                 ZStack {
                     ForEach([Schede.home, Schede.eventi, Schede.associazione, Schede.strumenti, Schede.profilo], id: \.self) { t in
                         if visti.contains(t) || t == tab {
-                            vista(t).opacity(t == tab ? 1 : 0).allowsHitTesting(t == tab)
+                            vista(t)
+                                .opacity(t == tab ? 1 : 0)
+                                .scaleEffect(t == tab ? 1 : 0.965)
+                                .offset(y: t == tab ? 0 : 14)
+                                .blur(radius: t == tab ? 0 : 3)
+                                .allowsHitTesting(t == tab)
                         }
                     }
-                    if tab == Schede.mappa { MapTab() }
+                    if tab == Schede.mappa {
+                        MapTab().transition(.asymmetric(insertion: .opacity.combined(with: .scale(scale: 1.04)), removal: .opacity))
+                    }
                 }
+                .animation(.spring(response: 0.42, dampingFraction: 0.86), value: tab)
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     if !land && tab != Schede.mappa {
                         BarraSchede(tab: $tab, verticale: false, badge: badge).padding(.horizontal, 14).padding(.bottom, 2)
@@ -517,6 +525,7 @@ struct EventiV2: View {
                     Divider().overlay(Theme.stroke)
                     if let e = scelto ?? visibili.first {
                         EventoScheda(evento: e).id(e.id)
+                            .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .opacity))
                     } else {
                         Text("Scegli un evento").foregroundStyle(Theme.dim).frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
@@ -588,18 +597,21 @@ struct EventiV2: View {
                     }
                     .frame(maxWidth: .infinity).padding(.top, 40)
                 }
-                ForEach(settimane, id: \.0) { titolo, ev in
-                    Text(titolo).font(.system(size: 12, weight: .heavy)).foregroundStyle(Theme.dim).padding(.top, 4)
-                    ForEach(ev) { e in
-                        if land {
-                            Button { haptic(.soft); scelto = e } label: {
-                                RigaEventoV2(evento: e)
-                                    .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(scelto?.id == e.id ? Theme.olive : .clear, lineWidth: 2))
+                ForEach(Array(settimane.enumerated()), id: \.element.0) { i, sett in
+                    Text(sett.0).font(.system(size: 12, weight: .heavy)).foregroundStyle(Theme.dim).padding(.top, 4).comparsa(i * 2)
+                    ForEach(Array(sett.1.enumerated()), id: \.element.id) { j, e in
+                        Group {
+                            if land {
+                                Button { haptic(.soft); withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { scelto = e } } label: {
+                                    RigaEventoV2(evento: e)
+                                        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(scelto?.id == e.id ? Theme.olive : .clear, lineWidth: 2))
+                                }
+                                .buttonStyle(PressStyle())
+                            } else {
+                                NavigationLink(value: e) { RigaEventoV2(evento: e) }.buttonStyle(PressStyle())
                             }
-                            .buttonStyle(PressStyle())
-                        } else {
-                            NavigationLink(value: e) { RigaEventoV2(evento: e) }.buttonStyle(PressStyle())
                         }
+                        .comparsa(i * 2 + j + 1)
                     }
                 }
             }
@@ -634,7 +646,7 @@ struct EventoScheda: View {
                 CopertinaEvento(evento: e, altezza: 210)
                     .overlay(alignment: .bottom) { LinearGradient(colors: [.clear, Theme.bg], startPoint: .center, endPoint: .bottom) }
                 VStack(alignment: .leading, spacing: 12) {
-                    testata
+                    testata.comparsa(0)
                     if e.annullato {
                         Label("Evento annullato: nel registro presenze non conta", systemImage: "xmark.octagon.fill")
                             .font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.red)
@@ -644,15 +656,15 @@ struct EventoScheda: View {
                     }
                     if e.privato { nascostoCard }
                     if e.proposto && !e.privato { proposta }
-                    tessere
-                    if !e.proposto && !e.annullato && e.fase != 2 { iscrizione }
+                    tessere.comparsa(1)
+                    if !e.proposto && !e.annullato && e.fase != 2 { iscrizione.comparsa(2) }
                     if let avviso { Text(avviso).font(.caption).foregroundStyle(Theme.oliveBright) }
                     if let errore { ErrorCard(text: errore) }
-                    if e.membro && !e.proposto { sezioni }
-                    if let n = e.note, !n.isEmpty { descrizione(n) }
-                    if let p = presenze { risposteCard(p) }
-                    CommentiEventoCard(evento: e.id)
-                    if gestore { gestioneCard }
+                    if e.membro && !e.proposto { sezioni.comparsa(3) }
+                    if let n = e.note, !n.isEmpty { descrizione(n).comparsa(4) }
+                    if let p = presenze { risposteCard(p).comparsa(5) }
+                    CommentiEventoCard(evento: e.id).comparsa(6)
+                    if gestore { gestioneCard.comparsa(7) }
                     if gestore && !e.proposto && !e.privato { annullaRiga }
                 }
                 .padding(.horizontal, 16)

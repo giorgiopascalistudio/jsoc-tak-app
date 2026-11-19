@@ -667,7 +667,7 @@ struct ArchivioPersonaleView: View {
             .listRowBackground(Theme.surface)
         }
         Section {
-            ForEach(archivio.tracce) { t in
+            ForEach(Array(archivio.tracce.enumerated()), id: \.element.id) { i, t in
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Image(systemName: "point.bottomleft.forward.to.point.topright.scurvepath").foregroundStyle(Theme.amber)
@@ -690,6 +690,7 @@ struct ArchivioPersonaleView: View {
                     .buttonStyle(.bordered).tint(Theme.olive).font(.system(size: 12.5, weight: .bold))
                 }
                 .padding(.vertical, 4)
+                .comparsa(i)
                 .swipeActions { Button(role: .destructive) { archivio.elimina(t) } label: { Label("Elimina", systemImage: "trash") } }
             }
         }
@@ -896,6 +897,7 @@ struct SchedaSocioView: View {
                     }
                     if let st = s.statistiche {
                         HStack(spacing: 8) {
+                            // numeri che entrano uno dopo l'altro
                             numero("\(st.presenze)/\(st.eventi)", "PRESENZE")
                             numero(st.percentuale.map { "\($0)%" } ?? "—", "FREQUENZA")
                             numero("\(st.arbitro)", "DA ARBITRO")
@@ -906,11 +908,11 @@ struct SchedaSocioView: View {
                         campo("Codice fiscale", s.cf); campo("Indirizzo", s.indirizzo); campo("Ammesso il", s.ammesso.map { dataIT($0) })
                         if let u = s.uscito, !u.isEmpty { campo("Uscito il", dataIT(u)); campo("Motivo", s.uscita_motivo) }
                         if let g = s.gruppi, !g.isEmpty { campo("Gruppi", g.joined(separator: ", ")) }
-                    }
+                    }.comparsa(1)
                     Card(title: "Salute ed emergenze", icon: "cross.case.fill") {
                         campo("Gruppo sanguigno", s.gruppo_sanguigno); campo("Contatto di emergenza", s.emergenza)
                         campo("Certificato medico fino al", s.certificato_scadenza.map { dataIT($0) }); campo("Note", s.note_profilo)
-                    }
+                    }.comparsa(2)
                     if let t = s.tesseramenti, !t.isEmpty {
                         Card(title: "Tesseramento FIGT", icon: "creditcard.fill") {
                             ForEach(t, id: \.anno) { x in
@@ -921,7 +923,7 @@ struct SchedaSocioView: View {
                                     Etichetta(testo: x.intranet == 1 ? "ASSICURATO" : (x.figt == 1 ? "TESSERATO" : "DA FARE"), colore: x.intranet == 1 ? Theme.green : Theme.amber)
                                 }
                             }
-                        }
+                        }.comparsa(3)
                     }
                     if let q = s.quote, !q.isEmpty {
                         Card(title: "Quote", icon: "eurosign.circle.fill") {
@@ -933,7 +935,7 @@ struct SchedaSocioView: View {
                                     Image(systemName: x.pagata == 1 ? "checkmark.circle.fill" : "exclamationmark.circle").foregroundStyle(x.pagata == 1 ? Theme.green : Theme.red)
                                 }
                             }
-                        }
+                        }.comparsa(4)
                     }
                     if let m = s.movimenti, !m.isEmpty {
                         Card(title: "Movimenti di cassa", icon: "banknote.fill") {
@@ -947,7 +949,7 @@ struct SchedaSocioView: View {
                                     Text((x.tipo == "uscita" ? "−" : "+") + euro(x.importo)).font(Theme.mono(13, .bold)).foregroundStyle(x.tipo == "uscita" ? Theme.red : Theme.green)
                                 }
                             }
-                        }
+                        }.comparsa(5)
                     }
                     if let ev = s.eventi, !ev.isEmpty {
                         Card(title: "Eventi", icon: "calendar") {
@@ -961,12 +963,12 @@ struct SchedaSocioView: View {
                                     Text(etichetta(e)).font(.system(size: 11, weight: .bold)).foregroundStyle(colore(e))
                                 }
                             }
-                        }
+                        }.comparsa(6)
                     }
                     if let d = s.dispositivi, !d.isEmpty {
                         Card(title: "Dispositivi collegati", icon: "ipad.and.iphone") {
                             ForEach(Array(d.enumerated()), id: \.offset) { _, x in Text(x.nome ?? "dispositivo").font(.system(size: 13)) }
-                        }
+                        }.comparsa(7)
                     }
                 } else if let errore { ErrorCard(text: errore) } else { ProgressView().frame(maxWidth: .infinity).padding(40) }
             }
