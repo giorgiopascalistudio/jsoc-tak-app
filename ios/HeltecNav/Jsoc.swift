@@ -389,10 +389,16 @@ final class JsocClient: ObservableObject {
         return URL(string: "\(indirizzo)/api/video/hls/\(p)/index.m3u8?g=\(g)")
     }
 
-    struct VideoConfig: Decodable { let srt_host: String; let srt_porta: Int; let percorso: String }
-    /// Indirizzo SRT per trasmettere: utente = callsign, password = il proprio gettone (niente da configurare).
+    struct VideoConfig: Decodable { let srt_host: String; let srt_porta: Int; let percorso: String; var rtmp: String? = nil }
+    /// Indirizzo per trasmettere: utente = callsign, password = il proprio gettone (niente da configurare).
+    /// RTMPS (TCP, cifrato) passa da internet senza Tailscale; SRT (UDP) solo dentro Tailscale, come riserva.
     func videoPubblica() async throws -> URL {
         let c: VideoConfig = try await get("/api/video/config")
+        if let r = c.rtmp, !r.isEmpty, !UserDefaults.standard.bool(forKey: "video.srt"),
+           var u = URLComponents(string: "\(r)/\(c.percorso)/cam") {
+            u.queryItems = [.init(name: "user", value: c.percorso), .init(name: "pass", value: gettone)]
+            if let url = u.url { return url }
+        }
         var u = URLComponents()
         u.scheme = "srt"; u.host = c.srt_host; u.port = c.srt_porta
         u.queryItems = [.init(name: "streamid", value: "publish:\(c.percorso):\(c.percorso):\(gettone)"), .init(name: "latency", value: "2000")]

@@ -4,6 +4,7 @@ import AVKit
 import ReplayKit
 import HaishinKit
 import SRTHaishinKit
+import RTMPHaishinKit
 
 // MARK: - Impostazioni video (come Larix: server MediaMTX con utente e password OTS)
 
@@ -56,6 +57,7 @@ final class Trasmissione: ObservableObject, MTHKViewRepresentable.PreviewSource 
     init() {
         Task {
             await StreamSessionBuilderFactory.shared.register(SRTSessionFactory())
+            await StreamSessionBuilderFactory.shared.register(RTMPSessionFactory())
         }
     }
 
