@@ -456,21 +456,6 @@ struct DocsTab: View {
                         }
                     }
                 }
-                Section {
-                    NavigationLink { BachecaView() } label: {
-                        HStack(spacing: 12) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 8).fill(Theme.olive.opacity(0.18)).frame(width: 44, height: 44)
-                                Image(systemName: "point.3.connected.trianglepath.dotted").foregroundStyle(Theme.olive)
-                            }
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Bacheca indizi").font(.headline).foregroundStyle(.white)
-                                Text("Persone, famiglie, luoghi, prove e codici collegati").font(.caption).foregroundStyle(Theme.dim)
-                            }
-                        }
-                    }
-                    .listRowBackground(Theme.surface)
-                }
                 Section("Fascicoli") {
                     ForEach(docs.fascicoli.filter { query.isEmpty || $0.name.localizedCaseInsensitiveContains(query) }) { f in
                         NavigationLink(value: f.name) { FascicoloRow(f: f) }
@@ -485,7 +470,6 @@ struct DocsTab: View {
             .navigationTitle("Documenti")
             .nightToggle()
             .navigationDestination(for: String.self) { name in FascicoloView(name: name) }
-            .navigationDestination(isPresented: $bacheca) { BachecaView() }
             .toolbar {
                 Button { importing = true } label: { Image(systemName: "square.and.arrow.down") }
             }

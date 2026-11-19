@@ -115,6 +115,7 @@ struct StrumentiTab: View {
                     ])
                     EtichettaSezione(testo: "Giochi e missioni")
                     griglia([
+                        voce("bolt.shield.fill", "Prove pronte", "bomba, enigmi, cifrari, quiz: scegli e via") { AnyView(ProvePronteView()) },
                         voce("flag.checkered", "Missioni (fasi E)", "fasi, codici, QR, GPS, indizi, rami") { AnyView(MissioniView()) },
                         voce("flame.fill", "Giochi da campo", "bomba, bandiera, nucleare, terminale") { AnyView(GiochiCampoView()) },
                     ])
@@ -307,7 +308,8 @@ struct HomeV2: View {
 
     var contenuto: some View {
         GeometryReader { g in
-            let land = g.size.width > g.size.height
+            // due colonne quando c'è spazio (iPad anche in verticale, telefono in orizzontale)
+            let land = g.size.width > g.size.height || g.size.width > 700
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     intestazione
@@ -508,8 +510,8 @@ struct EventiV2: View {
 
     var contenuto: some View {
         GeometryReader { g in
-            if g.size.width > g.size.height {
-                // orizzontale: elenco a sinistra, scheda dell'evento a destra
+            if g.size.width > g.size.height || g.size.width > 700 {
+                // orizzontale o iPad: elenco a sinistra, scheda dell'evento a destra
                 HStack(spacing: 0) {
                     elenco(land: true).frame(width: min(400, g.size.width * 0.42))
                     Divider().overlay(Theme.stroke)

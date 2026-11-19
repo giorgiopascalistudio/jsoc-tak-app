@@ -152,9 +152,12 @@ struct MappaTattica: View {
         GeometryReader { g in
             let land = g.size.width > g.size.height
             let ins = margini
-            // con l'isola dinamica: accanto all'isola solo le informazioni, i pulsanti escono con uno swipe dal bordo
-            let isola = land && ins.left >= 30
-            let lBarra: CGFloat = land ? (isola && !barraVisibile ? ins.left : 66 + ins.left) : 0
+            // con l'isola dinamica: accanto all'isola solo le informazioni, i pulsanti escono con uno swipe dal bordo.
+            // L'iPad non ha l'isola: gli do una colonna uguale, così ha la stessa mappa nuova del telefono
+            let veraIsola = ins.left >= 30
+            let colonna: CGFloat = veraIsola ? ins.left : (UIDevice.current.userInterfaceIdiom == .pad ? 76 : 0)
+            let isola = land && colonna >= 30
+            let lBarra: CGFloat = land ? (isola && !barraVisibile ? colonna : 66 + colonna) : 0
             let lPannello: CGFloat = pannello == nil ? 0 : (land ? min(360, (g.size.width - ins.left - ins.right) * 0.42) : 0)
             let hStato: CGFloat = isola ? 0 : 30 + (land ? 0 : ins.top)
             let hPannelloV: CGFloat = (!land && pannello != nil) ? g.size.height * 0.46 : 0
@@ -169,10 +172,10 @@ struct MappaTattica: View {
                 if land {
                     HStack(spacing: 0) {
                         ZStack(alignment: .leading) {
-                            if isola { InfoIsola().frame(width: ins.left) }
+                            if isola { InfoIsola(spazioIsola: veraIsola).frame(width: colonna) }
                             if !isola || barraVisibile {
                                 BarraStrumenti(verticale: true, attivo: pannello, notte: night.on, impostazioni: isola, azione: barra)
-                                    .padding(.leading, ins.left).padding(.bottom, ins.bottom * 0.6)
+                                    .padding(.leading, colonna).padding(.bottom, ins.bottom * 0.6)
                                     .transition(.move(edge: .leading).combined(with: .opacity))
                             }
                         }
@@ -2314,6 +2317,7 @@ struct SettoreAnello: Shape {
 
 /// Colonna accanto all'isola dinamica: ora e collegamento sopra, direzione/quota/GPS sotto.
 struct InfoIsola: View {
+    var spazioIsola = true
     @EnvironmentObject var location: LocationService
     @ObservedObject private var jsoc = JsocClient.shared
     @ObservedObject private var traccia = Traccia.shared
@@ -2336,7 +2340,7 @@ struct InfoIsola: View {
             }
             .padding(.bottom, 8)
             .frame(maxHeight: .infinity)
-            Color.clear.frame(height: 132)      // l'isola
+            Color.clear.frame(height: spazioIsola ? 132 : 24)      // l'isola (sull'iPad solo un respiro)
             VStack(spacing: 4) {
                 if let h = location.heading {
                     Text("\(gradi3(h - (location.declinazione ?? 4.6))) \(Mission.cardinale(h))").foregroundStyle(Theme.oliveBright)
