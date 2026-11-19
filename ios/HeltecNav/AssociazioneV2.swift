@@ -140,7 +140,7 @@ enum NomiAssoc {
     static func carica(_ k: String?) -> String { cariche.first { $0.0 == k }?.1 ?? "Socio" }
     static let conti: [String: String] = ["cassa": "Contanti", "banca": "Banca", "paypal": "PayPal"]
     static func conto(_ k: String?) -> String { conti[k ?? "cassa"] ?? (k ?? "Contanti").capitalized }
-    static let categorieEntrata = ["quote associative", "tesseramenti e polizze", "prove", "pallini", "gare e tornei", "abbigliamento e patch", "donazioni", "contributi soci per eventi", "altro"]
+    static let categorieEntrata = ["quote associative", "tesseramenti e polizze", "prove", "pallini", "gare e tornei", "abbigliamento e patch", "donazioni ed erogazioni liberali", "sponsorizzazioni", "5x1000", "contributi pubblici", "contributi soci per eventi", "altro"]
     static let categorieUscita = ["affiliazione", "tesseramenti e polizze", "campo e manutenzione", "gare e tornei", "iscrizioni gare", "materiale", "pallini", "rimborsi", "abbigliamento e patch", "eventi e logistica", "trasporti", "banca e oneri", "altro"]
     static let documenti: [(String, String)] = [
         ("domanda", "Domanda d'iscrizione firmata"), ("documento", "Documento e codice fiscale"), ("privacy", "Consenso privacy"),
@@ -316,6 +316,11 @@ struct AssociazioneHomeV2: View {
             voce("checklist", "Presenze", "registro") { RegistroPresenzeView() }.comparsa(10)
             voce("eurosign.circle.fill", "Rendiconto", "conti dell'anno") { RendicontoView() }.comparsa(11)
             voce("calendar", "Calendario", "eventi e presenze") { CalendarioView() }.comparsa(12)
+            voce("signature", "Iscrizione", "domanda firmata") { DomandaIscrizioneView() }.comparsa(13)
+            voce("calendar.badge.clock", "Scadenze", "certificato, quota") { ScadenzarioView() }.comparsa(14)
+            voce("doc.plaintext.fill", "Ricevute", perm.puo("cassa") ? "emetti e archivia" : "le tue ricevute") { RicevuteView() }.comparsa(15)
+            voce("shield.lefthalf.filled", "Assicurazione", "polizza e infortuni") { AssicurazioneView() }.comparsa(16)
+            voce("arrow.left.arrow.right.square.fill", "Prestiti", perm.puo("magazzino") ? "materiale ai soci" : "materiale che hai") { PrestitiView() }.comparsa(17)
         }
     }
 
@@ -342,6 +347,10 @@ struct AssociazioneHomeV2: View {
                 if perm.puo("soci") { voce("books.vertical.fill", "Libro soci", "ammissioni e uscite") { LibroSociView() } }
                 voce("person.3.sequence.fill", "Cariche", "chi fa cosa") { CaricheView() }
                 if perm.puo("soci") { voce("person.3.fill", "Gruppi", "squadre e sottogruppi") { GruppiView() } }
+                if perm.puo("aspiranti") || perm.puo("soci") { voce("person.badge.plus", "Domande", "iscrizioni da valutare") { DomandeView() } }
+                if perm.gestione { voce("building.2.fill", "Direttivo", "riunioni e verbali") { RiunioniView() } }
+                if perm.puo("documenti") { voce("printer.fill", "Stampe", "registri, rendiconto, attestati") { StampeView() } }
+                if perm.puo("documenti") { voce("seal.fill", "Dati associazione", "carta intestata, firma") { IntestazioneView() } }
             }
         }
     }
