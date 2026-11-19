@@ -414,8 +414,12 @@ struct EntraView: View {
                         Label("Codice \(inv.1)", systemImage: "checkmark.seal.fill").font(Theme.mono(14, .bold)).foregroundStyle(Theme.olive)
                         Text(inv.0).font(Theme.mono(10)).foregroundStyle(Theme.dim).lineLimit(1).truncationMode(.middle)
                     } else {
-                        Button { scanner = true } label: { Label("Inquadra il QR", systemImage: "camera.viewfinder") }
+                        Button { Diagnostica.passo("apre scanner"); scanner = true } label: { Label("Inquadra il QR", systemImage: "camera.viewfinder") }
                             .buttonStyle(PrimaryButtonStyle())
+                        Button {
+                            if let t = UIPasteboard.general.string { link = t }
+                        } label: { Label("Incolla il link copiato", systemImage: "doc.on.clipboard") }
+                            .buttonStyle(.bordered).tint(Theme.olive)
                         TextField("oppure incolla il link jsoctak://…", text: $link)
                             .textInputAutocapitalization(.never).autocorrectionDisabled()
                             .font(Theme.mono(12)).padding(10)
@@ -435,13 +439,14 @@ struct EntraView: View {
                     guard let inv = invito else { return }
                     let (u, c) = inv
                     lavoro = true; errore = nil
+                    Diagnostica.passo("entra")
                     Task {
                         do {
                             try await jsoc.entra(indirizzo: u, codice: c, nome: nome, callsign: callsign)
                             UINotificationFeedbackGenerator().notificationOccurred(.success)
                             invitoAperto = ""
                             await EventoStore.shared.aggiorna(jsoc)
-                        } catch { errore = error.localizedDescription }
+                        } catch { errore = error.localizedDescription; Diagnostica.passo("entra errore: \(error.localizedDescription)") }
                         lavoro = false
                     }
                 } label: {
@@ -455,16 +460,27 @@ struct EntraView: View {
             .frame(maxWidth: 560)
             .frame(maxWidth: .infinity)
         }
-        .onAppear { if !invitoAperto.isEmpty { link = invitoAperto } }
+        .onAppear { Diagnostica.passo("schermata entra"); if !invitoAperto.isEmpty { link = invitoAperto } }
+        .onChange(of: link) { l in if JsocClient.leggiInvito(l) != nil { Diagnostica.passo("invito letto"); Diagnostica.invia() } }
         .onChange(of: invitoAperto) { if !$0.isEmpty { link = $0 } }
-        .sheet(isPresented: $scanner) {
-            ZStack(alignment: .bottom) {
+        .fullScreenCover(isPresented: $scanner) {
+            ZStack {
+                Color.black.ignoresSafeArea()
                 CodeScanner { s, _ in
+                    Diagnostica.passo("QR letto")
                     if JsocClient.leggiInvito(s) != nil { link = s; scanner = false }
                 }
                 .ignoresSafeArea()
-                Text("Inquadra il QR dell'invito JSOC TAK").font(.subheadline.weight(.semibold))
-                    .padding(12).background(.ultraThinMaterial, in: Capsule()).padding(.bottom, 40)
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button { scanner = false } label: { Image(systemName: "xmark.circle.fill").font(.largeTitle).symbolRenderingMode(.hierarchical) }
+                            .tint(.white).padding(20)
+                    }
+                    Spacer()
+                    Text("Inquadra il QR dell'invito JSOC TAK").font(.subheadline.weight(.semibold))
+                        .padding(12).background(.ultraThinMaterial, in: Capsule()).padding(.bottom, 40)
+                }
             }
         }
     }
@@ -570,8 +586,13 @@ struct InvitoSheet: View {
                     Text(i.codice).font(Theme.mono(28, .heavy)).tracking(4).foregroundStyle(Theme.olive)
                     Text(dispositivo ? "Valido 10 minuti, per un solo dispositivo." : "Valido 7 giorni, per una sola persona. Il socio lo inquadra all'apertura di JSOC TAK.")
                         .font(.caption).foregroundStyle(Theme.dim).multilineTextAlignment(.center)
-                    ShareLink(item: i.link) { Label("Condividi il link", systemImage: "square.and.arrow.up") }
-                        .buttonStyle(.bordered).tint(Theme.olive)
+                    HStack {
+                        Button { UIPasteboard.general.string = i.link; UINotificationFeedbackGenerator().notificationOccurred(.success) } label: {
+                            Label("Copia il link", systemImage: "doc.on.doc")
+                        }
+                        ShareLink(item: i.link) { Label("Condividi", systemImage: "square.and.arrow.up") }
+                    }
+                    .buttonStyle(.bordered).tint(Theme.olive)
                 } else {
                     Spacer()
                     Button { crea() } label: { Label(dispositivo ? "Mostra il QR" : "Crea invito \(ruolo)", systemImage: "qrcode") }

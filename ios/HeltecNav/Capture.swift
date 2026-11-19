@@ -94,25 +94,74 @@ struct CodeScanner: UIViewControllerRepresentable {
         override func viewDidLoad() {
             super.viewDidLoad()
             view.backgroundColor = .black
-            guard let dev = AVCaptureDevice.default(for: .video), let input = try? AVCaptureDeviceInput(device: dev),
-                  session.canAddInput(input) else { return }
+            switch AVCaptureDevice.authorizationStatus(for: .video) {
+            case .authorized: configura()
+            case .notDetermined:
+                AVCaptureDevice.requestAccess(for: .video) { ok in
+                    DispatchQueue.main.async { ok ? self.configura() : self.avviso("Permesso fotocamera negato: Impostazioni → JSOC TAK → Fotocamera") }
+                }
+            default: avviso("Permesso fotocamera negato: Impostazioni → JSOC TAK → Fotocamera")
+            }
+        }
+
+        private func avviso(_ t: String) {
+            let l = UILabel(); l.text = t; l.textColor = .white; l.numberOfLines = 0; l.textAlignment = .center
+            l.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(l)
+            NSLayoutConstraint.activate([l.centerXAnchor.constraint(equalTo: view.centerXAnchor), l.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+                                         l.widthAnchor.constraint(lessThanOrEqualTo: view.widthAnchor, constant: -40)])
+        }
+
+        /// fotocamera posteriore (sull'iPad `default(for:)` può dare quella frontale), messa a fuoco vicina
+        /// e un po' di zoom: così legge anche un QR mostrato sullo schermo di un altro telefono
+        private func configura() {
+            Diagnostica.passo("scanner: configura")
+            let dev = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) ?? AVCaptureDevice.default(for: .video)
+            guard let dev, let input = try? AVCaptureDeviceInput(device: dev) else { avviso("Fotocamera non disponibile"); return }
+            session.beginConfiguration()
+            if session.canSetSessionPreset(.high) { session.sessionPreset = .high }
+            guard session.canAddInput(input) else { session.commitConfiguration(); return }
             session.addInput(input)
             let out = AVCaptureMetadataOutput()
-            guard session.canAddOutput(out) else { return }
+            guard session.canAddOutput(out) else { session.commitConfiguration(); return }
             session.addOutput(out)
+            session.commitConfiguration()
             out.setMetadataObjectsDelegate(self, queue: .main)
             let wanted: [AVMetadataObject.ObjectType] = [.qr, .ean13, .ean8, .code128, .code39, .code93, .dataMatrix, .aztec, .pdf417, .upce, .itf14]
             out.metadataObjectTypes = wanted.filter { out.availableMetadataObjectTypes.contains($0) }
+            if (try? dev.lockForConfiguration()) != nil {
+                if dev.isFocusModeSupported(.continuousAutoFocus) { dev.focusMode = .continuousAutoFocus }
+                if dev.isAutoFocusRangeRestrictionSupported { dev.autoFocusRangeRestriction = .near }
+                if dev.isExposureModeSupported(.continuousAutoExposure) { dev.exposureMode = .continuousAutoExposure }
+                dev.videoZoomFactor = min(1.6, dev.activeFormat.videoMaxZoomFactor)
+                dev.unlockForConfiguration()
+            }
             let p = AVCaptureVideoPreviewLayer(session: session)
             p.videoGravity = .resizeAspectFill
-            view.layer.addSublayer(p)
+            p.frame = view.bounds
+            view.layer.insertSublayer(p, at: 0)
             preview = p
+            orienta()
+            Diagnostica.passo("scanner: avvio fotocamera")
             DispatchQueue.global(qos: .userInitiated).async { [session] in session.startRunning() }
+        }
+
+        /// sull'iPad in orizzontale l'anteprima va ruotata, altrimenti è storta e il QR è difficile da centrare
+        private func orienta() {
+            guard let c = preview?.connection, c.isVideoOrientationSupported,
+                  let o = view.window?.windowScene?.interfaceOrientation ?? UIApplication.shared.connectedScenes.compactMap({ ($0 as? UIWindowScene)?.interfaceOrientation }).first else { return }
+            switch o {
+            case .landscapeLeft: c.videoOrientation = .landscapeLeft
+            case .landscapeRight: c.videoOrientation = .landscapeRight
+            case .portraitUpsideDown: c.videoOrientation = .portraitUpsideDown
+            default: c.videoOrientation = .portrait
+            }
         }
 
         override func viewDidLayoutSubviews() {
             super.viewDidLayoutSubviews()
             preview?.frame = view.bounds
+            orienta()
         }
 
         override func viewWillDisappear(_ animated: Bool) {

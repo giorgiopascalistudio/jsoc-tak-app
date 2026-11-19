@@ -617,7 +617,7 @@ enum QR {
     static func immagine(_ testo: String, scala: CGFloat = 10) -> UIImage? {
         let f = CIFilter.qrCodeGenerator()
         f.message = Data(testo.utf8)
-        f.correctionLevel = "M"
+        f.correctionLevel = "L"   // meno fitto: si legge meglio da uno schermo
         guard let out = f.outputImage?.transformed(by: CGAffineTransform(scaleX: scala, y: scala)),
               let cg = CIContext().createCGImage(out, from: out.extent) else { return nil }
         return UIImage(cgImage: cg)

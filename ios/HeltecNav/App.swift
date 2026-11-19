@@ -21,6 +21,8 @@ struct JsocTakApp: App {
     @Environment(\.scenePhase) private var phase
     @State private var tab = UserDefaults.standard.integer(forKey: "debug.tab")   // per le anteprime
 
+    init() { Diagnostica.attiva() }
+
     var body: some Scene {
         WindowGroup {
             // Home · Eventi · Associazione · Strumenti (barra in basso, colonna a sinistra in orizzontale);
@@ -46,6 +48,8 @@ struct JsocTakApp: App {
             .environmentObject(rilevamenti)
             .environmentObject(mission)
             .onAppear {
+                Diagnostica.invia()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 15) { Diagnostica.avvioRiuscito() }
                 Avvisi.shared.attiva()
                 location.start()
                 if UserDefaults.standard.bool(forKey: "debug.landscape"),
@@ -86,6 +90,9 @@ struct JsocTakApp: App {
             }
             .onChange(of: phase) { p in
                 location.sfondo(p == .background)
+                Diagnostica.passo("fase \(p)")
+                if p == .background { Diagnostica.avvioRiuscito() }
+                if p == .active { Diagnostica.ripartito(); DispatchQueue.main.asyncAfter(deadline: .now() + 15) { Diagnostica.avvioRiuscito() }; Diagnostica.invia() }
                 if p == .active { Task { await evento.aggiorna(jsoc); await docs.sync(jsoc) } }
                 if p == .background { programmaControllo() }
             }
@@ -112,7 +119,7 @@ struct JsocTakApp: App {
             .onReceive(location.$heading.throttle(for: .seconds(2), scheduler: RunLoop.main, latest: true)) { h in
                 if let l = location.location { evento.registra(l, direzione: h) }
             }
-            .onChange(of: tab) { t in if t != Schede.mappa { ruotaSchermo(.allButUpsideDown) } }
+            .onChange(of: tab) { t in Diagnostica.passo("scheda \(t)"); if t != Schede.mappa { ruotaSchermo(.allButUpsideDown) } }
             .onReceive(NotificationCenter.default.publisher(for: .vaiTab)) { n in
                 if let t = n.userInfo?["tab"] as? Int { tab = t }
             }
@@ -121,6 +128,7 @@ struct JsocTakApp: App {
                 Task { await docs.sync(jsoc, force: true) }
             }
             .onOpenURL { url in
+                Diagnostica.passo("apre link \(url.scheme ?? "")")
                 if url.scheme == "jsoctak" {
                     UserDefaults.standard.set(url.absoluteString, forKey: "jsoc.invito")
                     tab = 0
