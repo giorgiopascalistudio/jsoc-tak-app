@@ -1,3 +1,4 @@
+import QuartzCore
 import Foundation
 import SwiftUI
 import CoreLocation
@@ -342,7 +343,11 @@ final class JsocClient: ObservableObject {
             let msg = (try? JSONDecoder().decode(JErrore.self, from: data))?.errore ?? "errore \(code)"
             throw JsocErrore.server(msg)
         }
-        return try JSONDecoder().decode(T.self, from: data)
+        let t0 = CACurrentMediaTime()
+        let v = try JSONDecoder().decode(T.self, from: data)
+        let ms = (CACurrentMediaTime() - t0) * 1000
+        if ms > 15 { Prestazioni.shared.attivita("decodifica \(r.url?.path ?? "") \(Int(ms)) ms (\(data.count / 1024) KB)") }
+        return v
     }
 
     func get<T: Decodable>(_ path: String) async throws -> T { try await esegui(try richiesta(path)) }
@@ -587,6 +592,8 @@ final class EventoStore: ObservableObject {
             guard idCorrente > 0 else { apriPersonale(); return }
             let ev = try await j.evento(idCorrente)
             if ev != corrente {
+                let t0 = CACurrentMediaTime()
+                defer { let ms = (CACurrentMediaTime() - t0) * 1000; if ms > 15 { Prestazioni.shared.attivita("applica evento \(Int(ms)) ms") } }
                 applica(ev)
                 try? JSONEncoder().encode(ev).write(to: fileEvento(ev.id), options: .atomic)
             }
@@ -648,7 +655,12 @@ final class EventoStore: ObservableObject {
         } catch {}
     }
 
-    private func salvaCoda() { try? JSONEncoder().encode(coda).write(to: fileCoda, options: .atomic) }
+    private func salvaCoda() {
+        let t0 = CACurrentMediaTime()
+        try? JSONEncoder().encode(coda).write(to: fileCoda, options: .atomic)
+        let ms = (CACurrentMediaTime() - t0) * 1000
+        if ms > 15 { Prestazioni.shared.attivita("salva coda posizioni (\(coda.count)) \(Int(ms)) ms") }
+    }
 }
 
 // MARK: - QR

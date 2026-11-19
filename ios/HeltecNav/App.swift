@@ -1,3 +1,4 @@
+import QuartzCore
 import SwiftUI
 import Combine
 import BackgroundTasks
@@ -37,6 +38,14 @@ struct JsocTakApp: App {
     @State private var tab = UserDefaults.standard.integer(forKey: "debug.tab")   // per le anteprime
 
     init() { Diagnostica.attiva() }
+
+    /// misura un lavoro fatto sul filo principale e lo annota se è lento
+    private func misura(_ nome: String, _ f: () -> Void) {
+        let t0 = CACurrentMediaTime()
+        f()
+        let ms = (CACurrentMediaTime() - t0) * 1000
+        if ms > 15 { Prestazioni.shared.attivita("\(nome) \(Int(ms)) ms") }
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -86,16 +95,16 @@ struct JsocTakApp: App {
                             return OperatoreOrologio(cs: o.callsign, lat: la, lon: lo, collegato: o.collegato)
                         }
                     }
-                    mission.aggiorna(location: location, client: server, claude: claude)
+                    misura("missione") { mission.aggiorna(location: location, client: server, claude: claude) }
                     try? await Task.sleep(nanoseconds: 20_000_000_000)
                 }
             }
             .onReceive(location.$location.throttle(for: .seconds(15), scheduler: RunLoop.main, latest: true)) { _ in
-                mission.aggiorna(location: location, client: server, claude: claude)
+                misura("missione") { mission.aggiorna(location: location, client: server, claude: claude) }
             }
-            .onReceive(claude.$running.removeDuplicates().dropFirst()) { _ in mission.aggiorna(location: location, client: server, claude: claude, force: true) }
-            .onReceive(mission.$fatti.removeDuplicates().dropFirst()) { _ in mission.aggiorna(location: location, client: server, claude: claude, force: true) }
-            .onReceive(mission.$finestra.map { $0?.code }.removeDuplicates().dropFirst()) { _ in mission.aggiorna(location: location, client: server, claude: claude, force: true) }
+            .onReceive(claude.$running.removeDuplicates().dropFirst()) { _ in misura("missione") { mission.aggiorna(location: location, client: server, claude: claude, force: true) } }
+            .onReceive(mission.$fatti.removeDuplicates().dropFirst()) { _ in misura("missione") { mission.aggiorna(location: location, client: server, claude: claude, force: true) } }
+            .onReceive(mission.$finestra.map { $0?.code }.removeDuplicates().dropFirst()) { _ in misura("missione") { mission.aggiorna(location: location, client: server, claude: claude, force: true) } }
             .task {
                 // biblioteca: controlla le novità ogni 2 minuti, anche col telefono bloccato
                 // (l'app resta viva grazie alla posizione in background) -> notifiche
@@ -131,7 +140,7 @@ struct JsocTakApp: App {
                     try? await Task.sleep(nanoseconds: 15_000_000_000)
                 }
             }
-            .onReceive(location.$location) { l in if let l { evento.registra(l, direzione: location.heading) } }
+            .onReceive(location.$location) { l in if let l { misura("posizione") { evento.registra(l, direzione: location.heading) } } }
             .onReceive(location.$heading.throttle(for: .seconds(2), scheduler: RunLoop.main, latest: true)) { h in
                 if let l = location.location { evento.registra(l, direzione: h) }
             }

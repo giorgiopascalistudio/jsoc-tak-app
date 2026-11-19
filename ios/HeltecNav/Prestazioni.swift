@@ -1,61 +1,76 @@
 import UIKit
 
-/// Cronometro delle prestazioni: quanto ci mette ogni sezione a comparire dopo il tocco e quanti "blocchi"
-/// (fotogrammi oltre 50 ms) ci sono in ogni sezione. Ogni 30 s manda un riepilogo al server (diagnostica).
+/// Cronometro delle prestazioni. Un "sorvegliante" su un altro filo chiede ogni 50 ms al filo principale di rispondere:
+/// se tarda più di 80 ms l'app è davvero bloccata (non è il display che rallenta da solo a schermo fermo).
+/// Registra la sezione, cosa stava facendo l'app (decodifiche lente ecc.) e ogni 30 s manda il riepilogo al server.
+final class Sentinella: Thread {
+    override func main() {
+        while true {
+            let t0 = CACurrentMediaTime()
+            let s = DispatchSemaphore(value: 0)
+            DispatchQueue.main.async { s.signal() }
+            s.wait()
+            let dt = (CACurrentMediaTime() - t0) * 1000
+            if dt > 80 { DispatchQueue.main.async { Prestazioni.shared.blocco(dt) } }
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+    }
+}
+
 @MainActor
-final class Prestazioni: NSObject {
+final class Prestazioni {
     static let shared = Prestazioni()
-    private var link: CADisplayLink?
-    private var ultimo: CFTimeInterval = 0
-    private var inizio: CFTimeInterval?
-    private var verso = ""
+    private var sentinella: Sentinella?
     private(set) var sezione = "Home"
-    private var cambi: [String: [Double]] = [:]          // sezione → latenze in ms
-    private var blocchi: [String: [Double]] = [:]        // sezione → durate dei blocchi in ms
+    private var cambioDa: CFTimeInterval?
+    private var blocchi: [(String, Double, String)] = []     // sezione, ms, attività recenti
+    private var attivitaRecenti: [(CFTimeInterval, String)] = []
+    private var lente: [String] = []
+    private var cambi: [String] = []
     private var invio: Timer?
 
     static let nomi = [Schede.home: "Home", Schede.eventi: "Eventi", Schede.associazione: "Associazione", Schede.strumenti: "Strumenti",
                        Schede.profilo: "Profilo", Schede.mappa: "Mappa"]
 
     func avvia() {
-        guard link == nil else { return }
-        let l = CADisplayLink(target: self, selector: #selector(fotogramma(_:)))
-        l.add(to: .main, forMode: .common)
-        link = l
+        guard sentinella == nil else { return }
+        let s = Sentinella(); s.qualityOfService = .userInteractive; s.start()
+        sentinella = s
         invio = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in Task { @MainActor in Prestazioni.shared.manda() } }
     }
 
-    /// chiamato al tocco sulla barra delle sezioni
     func cambio(verso t: Int) {
-        inizio = CACurrentMediaTime()
-        verso = Self.nomi[t] ?? "\(t)"
+        sezione = Self.nomi[t] ?? "\(t)"
+        cambioDa = CACurrentMediaTime()
+        // quando il filo principale torna libero, la sezione è disegnata
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let i = self.cambioDa else { return }
+            self.cambi.append("\(self.sezione) \(Int((CACurrentMediaTime() - i) * 1000)) ms")
+            self.cambioDa = nil
+        }
     }
 
-    @objc private func fotogramma(_ l: CADisplayLink) {
-        let ora = l.timestamp
-        if ultimo > 0 {
-            let dt = (ora - ultimo) * 1000
-            if dt > 50 { blocchi[sezione, default: []].append(dt) }
-        }
-        ultimo = ora
-        if let i = inizio {
-            // primo fotogramma dopo il tocco: la sezione nuova è stata disegnata
-            cambi[verso, default: []].append((CACurrentMediaTime() - i) * 1000)
-            sezione = verso
-            inizio = nil
-        }
+    /// annota un lavoro fatto sul filo principale (es. decodifica lenta di una risposta del server)
+    func attivita(_ t: String) {
+        let ora = CACurrentMediaTime()
+        attivitaRecenti.append((ora, t))
+        attivitaRecenti.removeAll { ora - $0.0 > 3 }
+        if lente.count < 60 { lente.append(t) }
+    }
+
+    func blocco(_ ms: Double) {
+        let ora = CACurrentMediaTime()
+        let vicine = attivitaRecenti.filter { ora - $0.0 < 1.5 }.map(\.1).joined(separator: "; ")
+        if blocchi.count < 80 { blocchi.append((sezione, ms, vicine)) }
     }
 
     private func manda() {
-        guard !cambi.isEmpty || !blocchi.isEmpty else { return }
-        func riassunto(_ v: [Double]) -> String {
-            let o = v.sorted()
-            return "\(v.count)× media \(Int(v.reduce(0, +) / Double(v.count))) ms, max \(Int(o.last ?? 0)) ms"
-        }
-        var righe = ["PRESTAZIONI \(Diagnostica.versione) · \(UIDevice.current.model) iOS \(UIDevice.current.systemVersion)"]
-        for (k, v) in cambi.sorted(by: { $0.key < $1.key }) { righe.append("cambio → \(k): \(riassunto(v))") }
-        for (k, v) in blocchi.sorted(by: { $0.key < $1.key }) { righe.append("blocchi in \(k): \(riassunto(v))") }
-        cambi = [:]; blocchi = [:]
+        guard !blocchi.isEmpty || !cambi.isEmpty || !lente.isEmpty else { return }
+        var righe = ["PRESTAZIONI2 \(Diagnostica.versione) · \(UIDevice.current.model) iOS \(UIDevice.current.systemVersion)"]
+        if !cambi.isEmpty { righe.append("cambi sezione: " + cambi.joined(separator: ", ")) }
+        for b in blocchi { righe.append("BLOCCO \(Int(b.1)) ms in \(b.0)" + (b.2.isEmpty ? "" : " · durante: \(b.2)")) }
+        if !lente.isEmpty { righe.append("lavori lenti: " + lente.joined(separator: " | ")) }
+        blocchi = []; cambi = []; lente = []
         UserDefaults.standard.set(righe.joined(separator: "\n"), forKey: "diag.dainviare")
         Diagnostica.invia()
     }
