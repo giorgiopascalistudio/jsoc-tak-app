@@ -284,13 +284,12 @@ struct Comparsa: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            // solo opacità e spostamento: sfocatura e zoom costano troppo da ridisegnare (scatti)
             .opacity(visibile ? 1 : 0)
-            .offset(y: visibile || riduci ? 0 : 22)
-            .scaleEffect(visibile || riduci ? 1 : 0.96, anchor: .top)
-            .blur(radius: visibile || riduci ? 0 : 4)
+            .offset(y: visibile || riduci ? 0 : 14)
             .onAppear {
                 guard !visibile else { return }
-                withAnimation(.spring(response: 0.55, dampingFraction: 0.82).delay(riduci ? 0 : Double(min(indice, 12)) * 0.055)) { visibile = true }
+                withAnimation(.easeOut(duration: 0.32).delay(riduci ? 0 : Double(min(indice, 8)) * 0.04)) { visibile = true }
             }
     }
 }

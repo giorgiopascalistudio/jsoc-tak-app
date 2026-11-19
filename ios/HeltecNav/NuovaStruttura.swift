@@ -66,17 +66,15 @@ struct ContenitoreSchede: View {
                         if visti.contains(t) || t == tab {
                             vista(t)
                                 .opacity(t == tab ? 1 : 0)
-                                .scaleEffect(t == tab ? 1 : 0.965)
-                                .offset(y: t == tab ? 0 : 14)
-                                .blur(radius: t == tab ? 0 : 3)
+                                .offset(y: t == tab ? 0 : 8)
                                 .allowsHitTesting(t == tab)
                         }
                     }
                     if tab == Schede.mappa {
-                        MapTab().transition(.asymmetric(insertion: .opacity.combined(with: .scale(scale: 1.04)), removal: .opacity))
+                        MapTab().transition(.opacity)
                     }
                 }
-                .animation(.spring(response: 0.42, dampingFraction: 0.86), value: tab)
+                .animation(.easeOut(duration: 0.22), value: tab)
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     if !land && tab != Schede.mappa {
                         BarraSchede(tab: $tab, verticale: false, badge: badge).padding(.horizontal, 14).padding(.bottom, 2)

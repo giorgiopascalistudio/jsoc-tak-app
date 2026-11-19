@@ -317,6 +317,7 @@ struct AssociazioneHomeV2: View {
             voce("eurosign.circle.fill", "Rendiconto", "conti dell'anno") { RendicontoView() }.comparsa(11)
             voce("calendar", "Calendario", "eventi e presenze") { CalendarioView() }.comparsa(12)
             voce("signature", "Iscrizione", "domanda firmata") { DomandaIscrizioneView() }.comparsa(13)
+            voce("magnifyingglass.circle.fill", "FIGT", "regolamenti, polizze: cerca") { DocumentiFIGTView() }.comparsa(13)
             voce("calendar.badge.clock", "Scadenze", "certificato, quota") { ScadenzarioView() }.comparsa(14)
             voce("doc.plaintext.fill", "Ricevute", perm.puo("cassa") ? "emetti e archivia" : "le tue ricevute") { RicevuteView() }.comparsa(15)
             voce("shield.lefthalf.filled", "Assicurazione", "polizza e infortuni") { AssicurazioneView() }.comparsa(16)

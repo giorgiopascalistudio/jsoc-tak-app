@@ -1016,8 +1016,10 @@ struct AssicurazioneView: View {
                     Text("Ogni socio è assicurato tramite il tesseramento \(doc.intest.affiliazioni ?? "F.I.G.T."): la copertura è attiva solo dopo che il direttivo ha caricato il nominativo sull'Intranet FIGT (vedi Tesseramento).")
                         .font(.system(size: 13.5))
                     if let p = doc.intest.polizza, !p.isEmpty { Text(p).font(.system(size: 13.5)).foregroundStyle(Theme.oliveBright) }
+                    NavigationLink { DocumentiFIGTView() } label: { Label("Polizze, note sinistri e moduli FIGT nell'app", systemImage: "doc.text.magnifyingglass") }
+                        .tint(Theme.olive)
                     if let l = doc.intest.polizza_link, let u = URL(string: l), !l.isEmpty {
-                        Link(destination: u) { Label("Polizze e moduli sul sito FIGT", systemImage: "safari") }.tint(Theme.olive)
+                        Link(destination: u) { Label("Sito FIGT", systemImage: "safari") }.tint(Theme.olive)
                     }
                 }
                 .comparsa(0)
