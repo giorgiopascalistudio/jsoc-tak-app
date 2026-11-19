@@ -8,6 +8,7 @@ struct BarraSchede: View {
     @Binding var tab: Int
     let verticale: Bool
     var badge: [Int: Int] = [:]
+    @Namespace private var spazio
 
     static let voci: [(Int, String, String)] = [(Schede.home, "Home", "house.fill"), (Schede.eventi, "Eventi", "calendar"),
                                                (Schede.associazione, "Associazione", "shield.lefthalf.filled"),
@@ -33,11 +34,16 @@ struct BarraSchede: View {
                             .lineLimit(1).minimumScaleFactor(0.7)
                     }
                     .frame(maxWidth: verticale ? 64 : .infinity).frame(height: verticale ? 56 : 50)
-                    .background(on ? Theme.olive.opacity(0.18) : .clear, in: RoundedRectangle(cornerRadius: 18))
+                    .background {
+                        // la pastiglia scorre da una voce all'altra
+                        if on { RoundedRectangle(cornerRadius: 18).fill(Theme.olive.opacity(0.18)).matchedGeometryEffect(id: "sel", in: spazio) }
+                    }
+                    .scaleEffect(on ? 1 : 0.96)
                 }
                 .buttonStyle(PressStyle())
             }
         }
+        .animation(.spring(response: 0.32, dampingFraction: 0.8), value: tab)
         .padding(4)
         .background(Theme.surface.opacity(0.96), in: RoundedRectangle(cornerRadius: 24))
         .overlay(RoundedRectangle(cornerRadius: 24).strokeBorder(Theme.stroke))
@@ -55,6 +61,22 @@ struct ContenitoreSchede: View {
         [Schede.home: (home.dati?.avvisi ?? []).filter { $0.tipo != "evento" }.count,
          Schede.eventi: evento.nonLetti + evento.eventi.filter { $0.fase != 2 && $0.stato != "proposto" && $0.mia_risposta == nil }.count,
          Schede.associazione: (home.dati?.post_nuovi ?? 0) + (home.dati?.sondaggi_aperti ?? 0)]
+    }
+
+    /// entrata della scheda: dissolvenza e piccolo scorrimento solo sulla scheda che compare (costa poco)
+    struct EntrataScheda: ViewModifier {
+        let attiva: Bool
+        @State private var mostra = true
+        @Environment(\.accessibilityReduceMotion) private var riduci
+        func body(content: Content) -> some View {
+            content
+                .opacity(mostra ? 1 : 0)
+                .offset(y: mostra || riduci ? 0 : 12)
+                .onChange(of: attiva) { a in
+                    if a { withAnimation(.easeOut(duration: 0.24)) { mostra = true } }
+                    else { var t = Transaction(); t.disablesAnimations = true; withTransaction(t) { mostra = false } }
+                }
+        }
     }
 
     /// la scheda da mostrare sotto (la mappa si apre sopra, a schermo intero)
@@ -78,6 +100,7 @@ struct ContenitoreSchede: View {
                     TabView(selection: selezione) {
                         ForEach([Schede.home, Schede.eventi, Schede.associazione, Schede.strumenti, Schede.profilo], id: \.self) { t in
                             vista(t)
+                                .modifier(EntrataScheda(attiva: t == selezione.wrappedValue))
                                 .tag(t)
                                 .toolbar(.hidden, for: .tabBar)
                         }
