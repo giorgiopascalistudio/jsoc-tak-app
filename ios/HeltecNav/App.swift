@@ -63,6 +63,7 @@ struct JsocTakApp: App {
             .environmentObject(mission)
             .onAppear {
                 Diagnostica.invia()
+                Prestazioni.shared.avvia()
                 Task { await jsoc.aggiornaIndirizzo() }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 15) { Diagnostica.avvioRiuscito() }
                 Avvisi.shared.attiva()

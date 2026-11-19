@@ -19,7 +19,7 @@ struct BarraSchede: View {
         layout {
             ForEach(Self.voci, id: \.0) { v in
                 let on = tab == v.0
-                Button { if tab != v.0 { haptic(.soft) }; tab = v.0 } label: {
+                Button { if tab != v.0 { haptic(.soft); Prestazioni.shared.cambio(verso: v.0) }; tab = v.0 } label: {
                     VStack(spacing: 3) {
                         Image(systemName: v.2).font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(on ? Theme.oliveBright : Theme.dim)
