@@ -93,6 +93,7 @@ struct MappaTattica: View {
     @ObservedObject private var nav = NavStore.shared
     @ObservedObject private var volume = VolumeTasti.shared
     @ObservedObject private var traccia = Traccia.shared
+    @ObservedObject private var piani = PianiStore.shared
     @State private var selezione: SelezioneMappa?
     /// colonna dei pulsanti a scomparsa (orizzontale con l'isola): esce con uno swipe da sinistra
     @State private var barraVisibile = false
@@ -150,16 +151,19 @@ struct MappaTattica: View {
 
     var body: some View {
         GeometryReader { g in
-            let land = g.size.width > g.size.height
+            let land = g.size.width > g.size.height || UIDevice.current.userInterfaceIdiom == .pad
             let ins = margini
             // con l'isola dinamica: accanto all'isola solo le informazioni, i pulsanti escono con uno swipe dal bordo.
             // L'iPad non ha l'isola: gli do una colonna uguale, così ha la stessa mappa nuova del telefono
+            // iPad: barra degli strumenti fissa a sinistra (anche in verticale), barra di stato sempre in alto,
+            // niente colonna informazioni né scorrimento: lo schermo è grande
+            let pad = UIDevice.current.userInterfaceIdiom == .pad
             let veraIsola = ins.left >= 30
-            let colonna: CGFloat = veraIsola ? ins.left : (UIDevice.current.userInterfaceIdiom == .pad ? 76 : 0)
-            let isola = land && colonna >= 30
+            let colonna: CGFloat = veraIsola ? ins.left : 0
+            let isola = land && veraIsola
             let lBarra: CGFloat = land ? (isola && !barraVisibile ? colonna : 66 + colonna) : 0
             let lPannello: CGFloat = pannello == nil ? 0 : (land ? min(360, (g.size.width - ins.left - ins.right) * 0.42) : 0)
-            let hStato: CGFloat = isola ? 0 : 30 + (land ? 0 : ins.top)
+            let hStato: CGFloat = isola ? 0 : 30 + (land && !pad ? 0 : ins.top)
             let hPannelloV: CGFloat = (!land && pannello != nil) ? g.size.height * 0.46 : 0
             let hBarraV: CGFloat = land ? 0 : 60 + ins.bottom
             // zona di mappa davvero visibile (fuori da barre e pannelli)
@@ -174,7 +178,7 @@ struct MappaTattica: View {
                         ZStack(alignment: .leading) {
                             if isola { InfoIsola(spazioIsola: veraIsola).frame(width: colonna) }
                             if !isola || barraVisibile {
-                                BarraStrumenti(verticale: true, attivo: pannello, notte: night.on, impostazioni: isola, azione: barra)
+                                BarraStrumenti(verticale: true, attivo: pannello, notte: night.on, impostazioni: isola || pad, azione: barra)
                                     .padding(.leading, colonna).padding(.bottom, ins.bottom * 0.6)
                                     .transition(.move(edge: .leading).combined(with: .opacity))
                             }
@@ -207,7 +211,7 @@ struct MappaTattica: View {
                             }
                         })
                         VStack(spacing: 0) {
-                            if !isola { barraStato.padding(.trailing, max(ins.right * 0.6, 26)) }
+                            if !isola { barraStato.padding(.trailing, max(ins.right * 0.6, 26)).padding(.top, pad ? ins.top : 0) }
                             HStack(spacing: 0) {
                                 if let p = pannello {
                                     pannelloVista(p).padding(.bottom, ins.bottom)
@@ -215,7 +219,7 @@ struct MappaTattica: View {
                                         .background(vetroPannello)
                                         .transition(.move(edge: .leading).combined(with: .opacity))
                                 }
-                                if isola {
+                                if isola || pad {
                                     // lontano dagli angoli arrotondati dello schermo
                                     comandiOrizzontali(EdgeInsets(top: 0, leading: 0, bottom: max(ins.bottom, 10) + 6, trailing: 22))
                                 } else {
@@ -292,6 +296,7 @@ struct MappaTattica: View {
         .onChange(of: telecamere.accese) { _ in aggiornaSegni() }
         .onChange(of: rilievo) { _ in applicaLivelli() }
         .onChange(of: radar) { _ in applicaLivelli() }
+        .task(id: store.idCorrente) { await piani.carica(store.idCorrente) }
         .task {
             // telecamere della zona visibile (ogni 5 s se si è spostata la mappa)
             while !Task.isCancelled {
@@ -515,7 +520,7 @@ struct MappaTattica: View {
     /// Cambia quando cambia qualcosa da disegnare sulla mappa.
     var firmaDisegni: String {
         let d = store.corrente?.disegni ?? []
-        return "\(d.count)-\(d.last?.id ?? 0)-\(misura.count)-\(misura.last?.latitude ?? 0)-\(cerchiCentro?.latitude ?? 0)-\(cerchiCentro?.longitude ?? 0)-\(cerchiRaggi)-\(modo == .cerchi)-\(rotta.tappe.count)-\(rotta.tappe.last?.longitude ?? 0)-\(traccia.punti.count)-\(mostraAree)-\(livelli.versione)-\(DatiEvento.aree.count)"
+        return "\(d.count)-\(d.last?.id ?? 0)-\(misura.count)-\(misura.last?.latitude ?? 0)-\(cerchiCentro?.latitude ?? 0)-\(cerchiCentro?.longitude ?? 0)-\(cerchiRaggi)-\(modo == .cerchi)-\(rotta.tappe.count)-\(rotta.tappe.last?.longitude ?? 0)-\(traccia.punti.count)-\(mostraAree)-\(livelli.versione)-\(DatiEvento.aree.count)-\(piani.versione)"
     }
 
     func aggiornaDisegni() {
@@ -527,6 +532,10 @@ struct MappaTattica: View {
         }
         func cc(_ c: [CLLocationCoordinate2D]) -> [[Double]] { c.map { [$0.latitude, $0.longitude] } }
         if traccia.punti.count >= 2 { el.append(ElementoLivello(id: "t-traccia", tipo: "traccia", coord: cc(traccia.punti), colore: "#FF8C26")) }
+        // piano di gara scelto: il percorso con le tappe numerate, per tutta la squadra
+        if store.idCorrente > 0, let p = piani.scelto(store.idCorrente), p.tappe.count >= 2 {
+            el.append(ElementoLivello(id: "t-piano", tipo: "rotta", coord: p.tappe.map { [$0.lat, $0.lon] }, testo: p.nome, colore: "#4FC3F7"))
+        }
         if rotta.tappe.count >= 1 { el.append(ElementoLivello(id: "t-rotta", tipo: "rotta", coord: cc(rotta.tappe), colore: esadecimale(Theme.oliveBright))) }
         if misura.count >= 1 { el.append(ElementoLivello(id: "t-misura", tipo: "misura", coord: cc(misura), colore: esadecimale(Theme.amber), tratteggio: true)) }
         if modo == .cerchi, let c = cerchiCentro {
@@ -670,7 +679,7 @@ struct MappaTattica: View {
         VStack(spacing: 0) {
             ZStack(alignment: .top) {
                 HStack(alignment: .top) {
-                    ChipContestoMappa()
+                    EmptyView()
                     Spacer()
                     tastoTondo(pannello == .impostazioni ? "gearshape.fill" : "gearshape", pannello == .impostazioni ? Theme.oliveBright : oliva) {
                         pannello = pannello == .impostazioni ? nil : .impostazioni
@@ -739,7 +748,7 @@ struct MappaTattica: View {
                     }
                     .accessibilityLabel("Torna alla mappa di tutte le squadre")
                 }
-                ChipContestoMappa()
+                EmptyView()
                 Spacer(minLength: 0)
                 BarraRapida(usa: strumento) {
                     pannello = .strumenti
@@ -1179,6 +1188,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 }
 
 func ruotaSchermo(_ m: UIInterfaceOrientationMask) {
+    // sull'iPad la mappa funziona in entrambi i versi: non forzo la rotazione
+    guard UIDevice.current.userInterfaceIdiom != .pad else { return }
     guard AppDelegate.orientamenti != m else { return }
     AppDelegate.orientamenti = m
     guard let s = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else { return }
@@ -1870,6 +1881,8 @@ struct PannelloVideo: View {
     @State private var attivo: String?
     @State private var player: AVPlayer?
     @State private var errore: String?
+    @State private var colonna = false
+    @State private var intero = false
     @ObservedObject private var tx = Trasmissione.shared
 
     var body: some View {
@@ -1891,7 +1904,21 @@ struct PannelloVideo: View {
                         .padding(.horizontal, 7).padding(.vertical, 3).background(Theme.red, in: RoundedRectangle(cornerRadius: 5)).padding(8)
                 }
             }
-            .aspectRatio(16 / 9, contentMode: .fit)
+            .overlay(alignment: .topTrailing) {
+                if player != nil {
+                    HStack(spacing: 6) {
+                        Button { haptic(); withAnimation(.spring(response: 0.3)) { colonna.toggle() } } label: {
+                            Image(systemName: colonna ? "rectangle.compress.vertical" : "rectangle.expand.vertical")
+                        }
+                        Button { haptic(); intero = true } label: { Image(systemName: "arrow.up.left.and.arrow.down.right") }
+                    }
+                    .font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
+                    .padding(8).background(.black.opacity(0.55), in: Capsule()).padding(8)
+                }
+            }
+            .aspectRatio(colonna ? nil : 16 / 9, contentMode: .fit)
+            .frame(maxHeight: colonna ? .infinity : nil)
+            if !colonna {
             // flussi in una riga sola
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
@@ -1913,6 +1940,19 @@ struct PannelloVideo: View {
             }
             Spacer(minLength: 0)
             MiaCamera(tx: tx).padding(.horizontal, 12).padding(.bottom, 10)
+            }
+        }
+        .fullScreenCover(isPresented: $intero) {
+            ZStack(alignment: .topLeading) {
+                Color.black.ignoresSafeArea()
+                if let player { VideoPlayer(player: player).ignoresSafeArea() }
+                if let a = attivo {
+                    Text("LIVE · \(a)").font(Theme.mono(12, .heavy)).foregroundStyle(.black)
+                        .padding(.horizontal, 9).padding(.vertical, 4).background(Theme.red, in: RoundedRectangle(cornerRadius: 6))
+                        .padding(.top, 14).padding(.leading, 120)
+                }
+            }
+            .indietro("Mappa") { intero = false }
         }
         .task {
             while !Task.isCancelled {

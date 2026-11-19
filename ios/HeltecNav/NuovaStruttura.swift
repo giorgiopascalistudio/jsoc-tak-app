@@ -866,6 +866,9 @@ struct EventoScheda: View {
             }
             NavigationLink { SpeseView(evento: e) } label: { etichettaTasto("eurosign.circle.fill", "Spese", "chi deve a chi") }.buttonStyle(PressStyle())
             NavigationLink { ChecklistEventoView(evento: e) } label: { etichettaTasto("checklist", "Cosa porto", "la tua lista, privata") }.buttonStyle(PressStyle())
+            if e.tipo != "riunione" {
+                NavigationLink { PianoGaraView(evento: e) } label: { etichettaTasto("point.topleft.down.to.point.bottomright.curvepath.fill", "Piano di gara", "ordine OBJ, orari, alternative") }.buttonStyle(PressStyle())
+            }
             tasto("folder.fill", "Documenti", "file dell'evento") { store.scegli(e); documenti = true }
             tasto("bubble.left.and.bubble.right.fill", "Chat", "con chi partecipa") { store.scegli(e); UserDefaults.standard.set(true, forKey: "eventi.apriChat"); tutto = true }
             tasto("ellipsis.circle.fill", "Tutte le funzioni", "video, membri, punti") { store.scegli(e); tutto = true }

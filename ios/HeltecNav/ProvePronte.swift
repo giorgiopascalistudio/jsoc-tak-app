@@ -32,7 +32,18 @@ enum LivelloProva: Int, CaseIterable, Identifiable, Codable {
 
 enum TipoProva: String, CaseIterable, Identifiable, Codable {
     case fili, simboli, lucchetto, cifrario, sequenza, memoria, quiz, griglia, interruttori, radio
+    case labirinto, raggiungi, azimut, calcolo, kim, lampo
     var id: String { rawValue }
+    enum Categoria: String, CaseIterable { case enigmi = "Enigmi e congegni", campo = "Da campo · GPS e bussola", stress = "Sotto stress" }
+    var categoria: Categoria {
+        switch self {
+        case .raggiungi, .azimut: return .campo
+        case .calcolo, .kim, .lampo, .memoria: return .stress
+        default: return .enigmi
+        }
+    }
+    /// si può giocare con il manuale su un secondo telefono
+    var dueDispositivi: Bool { categoria != .campo }
     var nome: String {
         switch self {
         case .fili: return "Disinnesca la bomba"
@@ -45,6 +56,12 @@ enum TipoProva: String, CaseIterable, Identifiable, Codable {
         case .griglia: return "Navigazione su griglia"
         case .interruttori: return "Quadro interruttori"
         case .radio: return "Frequenza radio"
+        case .labirinto: return "Labirinto cieco"
+        case .raggiungi: return "Raggiungi il punto"
+        case .azimut: return "Punta l'azimut"
+        case .calcolo: return "Calcolo rapido"
+        case .kim: return "Memoria a vista"
+        case .lampo: return "Conta lampo"
         }
     }
     var icona: String {
@@ -59,6 +76,12 @@ enum TipoProva: String, CaseIterable, Identifiable, Codable {
         case .griglia: return "map.fill"
         case .interruttori: return "switch.2"
         case .radio: return "antenna.radiowaves.left.and.right"
+        case .labirinto: return "square.grid.3x3.middle.filled"
+        case .raggiungi: return "figure.walk.motion"
+        case .azimut: return "safari.fill"
+        case .calcolo: return "plus.forwardslash.minus"
+        case .kim: return "eye.square.fill"
+        case .lampo: return "bolt.circle.fill"
         }
     }
     var descrizione: String {
@@ -73,6 +96,12 @@ enum TipoProva: String, CaseIterable, Identifiable, Codable {
         case .griglia: return "Segui gli spostamenti e trova la casella finale"
         case .interruttori: return "Metti gli interruttori come dicono gli indizi"
         case .radio: return "Decifra la parola e sintonizza la frequenza giusta"
+        case .labirinto: return "Chi muove non vede i muri: il manuale lo guida a voce"
+        case .raggiungi: return "Arriva su un punto con freccia, azimut o solo MGRS"
+        case .azimut: return "Ruota sul posto e tieni la direzione giusta per 3 s"
+        case .calcolo: return "Conti a raffica, anche col fiatone tra uno sprint e l'altro"
+        case .kim: return "Memorizza la griglia e trova l'oggetto cambiato"
+        case .lampo: return "Forme lampo: conta solo quelle richieste"
         }
     }
     /// tempo consigliato in minuti per livello
@@ -81,6 +110,9 @@ enum TipoProva: String, CaseIterable, Identifiable, Codable {
         case .fili, .simboli, .memoria: return [0, 4, 3, 2][l.rawValue]
         case .quiz, .sequenza, .griglia, .radio: return [0, 6, 5, 4][l.rawValue]
         case .lucchetto, .cifrario, .interruttori: return [0, 8, 7, 6][l.rawValue]
+        case .labirinto, .kim, .lampo, .calcolo: return [0, 4, 3, 3][l.rawValue]
+        case .azimut: return [0, 4, 3, 3][l.rawValue]
+        case .raggiungi: return [0, 5, 6, 8][l.rawValue]
         }
     }
 }
@@ -123,7 +155,6 @@ final class StoricoProve: ObservableObject {
     func svuota() { esiti = []; UserDefaults.standard.removeObject(forKey: "prove.storico") }
 }
 
-@MainActor
 final class SessioneProva: ObservableObject {
     enum Stato { case pronta, incorso, vinta, persa }
     @Published var stato = Stato.pronta
@@ -189,11 +220,28 @@ struct ProvePronteView: View {
                     .padding(14).background(Theme.olive, in: RoundedRectangle(cornerRadius: 14))
                 }
                 .buttonStyle(PressStyle())
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 10)], spacing: 10) {
-                    ForEach(Array(TipoProva.allCases.enumerated()), id: \.element) { i, t in
-                        Button { haptic(); tipo = t } label: { scheda(t) }
-                            .buttonStyle(PressStyle())
-                            .comparsa(i)
+                NavigationLink { ManualeProvaView() } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "book.closed.fill").font(.system(size: 22)).foregroundStyle(Theme.amber).frame(width: 34)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("Sono il manuale (secondo telefono)").font(.system(size: 14.5, weight: .heavy)).foregroundStyle(.white)
+                            Text("Inserisci il codice del congegno e vedi solo gli indizi").font(.system(size: 11.5)).foregroundStyle(Theme.dim)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right").foregroundStyle(Theme.dim)
+                    }
+                    .padding(12).background(Theme.surface, in: RoundedRectangle(cornerRadius: 14))
+                    .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Theme.amber.opacity(0.4)))
+                }
+                .buttonStyle(PressStyle())
+                ForEach(TipoProva.Categoria.allCases, id: \.self) { cat in
+                    EtichettaSezione(testo: cat.rawValue)
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 10)], spacing: 10) {
+                        ForEach(Array(TipoProva.allCases.filter { $0.categoria == cat }.enumerated()), id: \.element) { i, t in
+                            Button { haptic(); tipo = t } label: { scheda(t) }
+                                .buttonStyle(PressStyle())
+                                .comparsa(i)
+                        }
                     }
                 }
                 if !storico.esiti.isEmpty {
@@ -223,7 +271,7 @@ struct ProvePronteView: View {
             PartitaProva(tipi: [t], livello: livello, squadra: squadra) { tipo = nil }
         }
         .fullScreenCover(isPresented: $assalto) {
-            PartitaProva(tipi: Array(TipoProva.allCases.filter { $0 != .quiz }.shuffled().prefix(3)), livello: livello, squadra: squadra) { assalto = false }
+            PartitaProva(tipi: Array(TipoProva.allCases.filter { $0 != .quiz && $0.categoria != .campo }.shuffled().prefix(3)), livello: livello, squadra: squadra) { assalto = false }
         }
     }
 
@@ -253,8 +301,9 @@ struct PartitaProva: View {
     var chiudi: () -> Void
     @StateObject private var s: SessioneProva
     @State private var indice = 0
-    @State private var seme = UInt64.random(in: 1...UInt64.max)
+    @State private var seme = UInt64.random(in: 1...0xFF_FFFF)
     @State private var chiediEsci = false
+    @State private var dueTelefoni = false
     private let orologio = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
 
     init(tipi: [TipoProva], livello: LivelloProva, squadra: String, chiudi: @escaping () -> Void) {
@@ -271,7 +320,10 @@ struct PartitaProva: View {
             Group {
                 switch s.stato {
                 case .pronta: pronta
-                case .incorso: contenuto.id("\(indice)-\(seme)")
+                case .incorso:
+                    VistaProva.crea(tipo, livello, seme) { prossima() }
+                        .id("\(indice)-\(seme)")
+                        .environment(\.modoProva, dueTelefoni && tipo.dueDispositivi ? .dispositivo : .entrambi)
                 case .vinta, .persa: risultato
                 }
             }
@@ -298,6 +350,12 @@ struct PartitaProva: View {
                 Text(livello.nome.uppercased()).font(.system(size: 10, weight: .heavy)).foregroundStyle(livello.colore)
             }
             Spacer()
+            if dueTelefoni && tipo.dueDispositivi && s.stato != .pronta {
+                VStack(alignment: .trailing, spacing: 0) {
+                    Text("CODICE MANUALE").font(.system(size: 8.5, weight: .heavy)).foregroundStyle(Theme.dim)
+                    Text(CodiceProva.crea(tipo, livello, seme)).font(Theme.mono(15, .heavy)).foregroundStyle(Theme.amber)
+                }
+            }
             if s.errori > 0 { Label("\(s.errori)", systemImage: "xmark.circle.fill").font(Theme.mono(14, .bold)).foregroundStyle(Theme.red) }
             TimelineView(.periodic(from: .now, by: 0.25)) { _ in
                 let r = s.stato == .pronta ? s.durata : s.restano
@@ -329,6 +387,18 @@ struct PartitaProva: View {
                 .font(.system(size: 22, weight: .black)).multilineTextAlignment(.center)
             Text(tipo.descrizione + ".\nGli indizi restano sempre a schermo. Ogni errore: −\(Int(livello.penalita)) secondi.")
                 .font(.system(size: 14)).foregroundStyle(Theme.dim).multilineTextAlignment(.center)
+            if tipi.contains(where: \.dueDispositivi) {
+                Toggle(isOn: $dueTelefoni) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Manuale su un secondo telefono").font(.system(size: 14, weight: .bold))
+                        Text("Qui solo il congegno; l'altro inserisce il codice in «Sono il manuale»").font(.caption).foregroundStyle(Theme.dim)
+                    }
+                }
+                .tint(Theme.olive).frame(maxWidth: 420)
+                if dueTelefoni {
+                    Text("Codice: \(CodiceProva.crea(tipo, livello, seme))").font(Theme.mono(22, .heavy)).foregroundStyle(Theme.amber)
+                }
+            }
             Button { s.parti() } label: { Label("VIA", systemImage: "play.fill").font(.system(size: 20, weight: .black)).frame(maxWidth: 320) }
                 .buttonStyle(PrimaryButtonStyle())
             Spacer()
@@ -336,26 +406,10 @@ struct PartitaProva: View {
         .padding(24)
     }
 
-    @ViewBuilder var contenuto: some View {
-        let fatta: () -> Void = { prossima() }
-        switch tipo {
-        case .fili: ProvaFili(d: DatiFili(livello, seme), fatta: fatta)
-        case .simboli: ProvaSimboli(d: DatiSimboli(livello, seme), fatta: fatta)
-        case .lucchetto: ProvaLucchetto(d: DatiLucchetto(livello, seme), fatta: fatta)
-        case .cifrario: ProvaCifrario(d: DatiCifrario(livello, seme), fatta: fatta)
-        case .sequenza: ProvaSequenze(d: DatiSequenze(livello, seme), fatta: fatta)
-        case .memoria: ProvaMemoria(livello: livello, seme: seme, fatta: fatta)
-        case .quiz: ProvaQuiz(d: DatiQuiz(livello, seme), fatta: fatta)
-        case .griglia: ProvaGriglia(d: DatiGriglia(livello, seme), fatta: fatta)
-        case .interruttori: ProvaInterruttori(d: DatiInterruttori(livello, seme), fatta: fatta)
-        case .radio: ProvaRadio(d: DatiRadio(livello, seme), fatta: fatta)
-        }
-    }
-
     func prossima() {
         if indice + 1 < tipi.count {
             Suoni.ok()
-            withAnimation(.spring(response: 0.4)) { indice += 1; seme = UInt64.random(in: 1...UInt64.max) }
+            withAnimation(.spring(response: 0.4)) { indice += 1; seme = UInt64.random(in: 1...0xFF_FFFF) }
         } else {
             s.vinci()
         }
@@ -383,7 +437,7 @@ struct PartitaProva: View {
     }
 
     func rigioca() {
-        indice = 0; seme = UInt64.random(in: 1...UInt64.max)
+        indice = 0; seme = UInt64.random(in: 1...0xFF_FFFF)
         s.errori = 0; s.stato = .pronta
     }
 
@@ -397,9 +451,14 @@ struct PartitaProva: View {
 struct LayoutProva<D: View, I: View>: View {
     @ViewBuilder var dispositivo: D
     @ViewBuilder var indizi: I
+    @Environment(\.modoProva) private var modo
     var body: some View {
         GeometryReader { g in
-            if g.size.width > 700 {
+            if modo == .dispositivo {
+                ScrollView { dispositivo.padding(16).frame(maxWidth: 640).frame(maxWidth: .infinity) }
+            } else if modo == .manuale {
+                pannelloIndizi.padding(14).frame(maxWidth: 760).frame(maxWidth: .infinity)
+            } else if g.size.width > 700 {
                 HStack(alignment: .top, spacing: 14) {
                     ScrollView { dispositivo.padding(16) }.frame(width: g.size.width * 0.52)
                     pannelloIndizi
