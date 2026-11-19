@@ -106,6 +106,7 @@ struct StrumentiTab: View {
                         voce("map", "Campo", "coordinate e conversioni") { AnyView(CampoView()) },
                         voce("target", "Balistica BB", "caduta e tempo di volo") { AnyView(PannelloBalistica(chiudi: {})) },
                         voce("cross.case.fill", "Primo soccorso", "MARCH passo passo") { AnyView(PannelloMedico(chiudi: {})) },
+                        voce("archivebox.fill", "Archivio personale", "tracce GPS e pacchetti coordinate") { AnyView(ArchivioPersonaleView()) },
                     ])
                     EtichettaSezione(testo: "Intelligence")
                     griglia([
@@ -273,6 +274,7 @@ struct RigaEventoV2: View {
         switch evento.mia_risposta {
         case "si": return ("Partecipi", Theme.oliveBright)
         case "no", "forse": return ("Non partecipi", Theme.red)
+        case "arbitro": return ("Arbitro", Theme.cyan)
         case "attesa": return ("In lista d'attesa", Theme.amber)
         default: return evento.fase == 2 ? ("", Theme.dim) : ("Senza risposta", Theme.amber)
         }
@@ -647,6 +649,8 @@ struct EventoScheda: View {
                     if e.membro && !e.proposto { sezioni }
                     if let n = e.note, !n.isEmpty { descrizione(n) }
                     if let p = presenze { risposteCard(p) }
+                    CommentiEventoCard(evento: e.id)
+                    if gestore { gestioneCard }
                     if gestore && !e.proposto && !e.privato { annullaRiga }
                 }
                 .padding(.horizontal, 16)
@@ -661,7 +665,7 @@ struct EventoScheda: View {
         .sheet(isPresented: $domande) { domandeSheet }
         .fullScreenCover(isPresented: $documenti) {
             ZStack(alignment: .topTrailing) {
-                DocsTab()
+                DocsTab().indietro { documenti = false }
                 Button { documenti = false } label: {
                     Image(systemName: "xmark.circle.fill").font(.system(size: 28)).symbolRenderingMode(.palette).foregroundStyle(.white, Theme.surface2)
                 }
@@ -669,6 +673,53 @@ struct EventoScheda: View {
             }
         }
         .navigationDestination(isPresented: $tutto) { EventoView(evento: e) }
+        .sheet(isPresented: $modifica) { NuovoEventoV2(modifica: e) }
+        .confirmationDialog("Eliminare \(e.nome)?", isPresented: $chiediElimina, titleVisibility: .visible) {
+            Button("Elimina definitivamente", role: .destructive) {
+                azione { try await jsoc.togliEvento(e.id); dismiss(); return "Evento eliminato" }
+            }
+        } message: { Text("Spariscono risposte, punti, chat e documenti dell'evento. Non si può annullare: se vuoi solo che non si faccia usa \"Annulla l'evento\".") }
+        .alert("Salva i punti come pacchetto", isPresented: $chiediPacchetto) {
+            TextField("Nome del pacchetto", text: $nomePacchetto)
+            Button("Salva") {
+                azione { _ = try await jsoc.nuovoPacchetto(["nome": nomePacchetto, "da_evento": e.id]); return "Punti salvati nell'archivio personale" }
+            }
+            Button("Annulla", role: .cancel) {}
+        }
+    }
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var modifica = false
+    @State private var chiediElimina = false
+    @State private var chiediPacchetto = false
+    @State private var nomePacchetto = ""
+    @State private var pacchetti: [JPacchetto] = []
+
+    var gestioneCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Gestione").font(.system(size: 15, weight: .heavy))
+            HStack(spacing: 8) {
+                Button { modifica = true } label: { Label("Modifica", systemImage: "pencil").frame(maxWidth: .infinity) }
+                Button { nomePacchetto = e.nome; chiediPacchetto = true } label: { Label("Salva punti", systemImage: "shippingbox").frame(maxWidth: .infinity) }
+            }
+            .buttonStyle(.bordered).tint(Theme.olive)
+            if !pacchetti.isEmpty {
+                Menu {
+                    ForEach(pacchetti) { p in
+                        Button("\(p.nome) · \(p.punti.count) punti") {
+                            azione { let n = try await jsoc.usaPacchetto(p.id, evento: e.id); return "\(n) punti aggiunti dalla mappa \(p.nome)" }
+                        }
+                    }
+                } label: { Label("Carica un pacchetto di coordinate", systemImage: "square.and.arrow.down.on.square").frame(maxWidth: .infinity) }
+                .buttonStyle(.bordered).tint(Theme.olive)
+            }
+            Button(role: .destructive) { chiediElimina = true } label: { Label("Elimina l'evento", systemImage: "trash").frame(maxWidth: .infinity) }
+                .buttonStyle(.bordered).tint(Theme.red)
+        }
+        .padding(12)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.stroke))
+        .task { pacchetti = (try? await jsoc.pacchetti()) ?? [] }
     }
 
     var testata: some View {
@@ -784,6 +835,13 @@ struct EventoScheda: View {
                         .background(mia == "si" || mia == "attesa" ? Theme.olive : Theme.surface, in: RoundedRectangle(cornerRadius: 13))
                         .overlay(RoundedRectangle(cornerRadius: 13).strokeBorder(Theme.stroke))
                 }
+                Button { scegli("arbitro") } label: {
+                    Label("Arbitro", systemImage: "flag.fill").font(.system(size: 14, weight: .heavy))
+                        .frame(maxWidth: .infinity).frame(height: 44)
+                        .foregroundStyle(mia == "arbitro" ? Color.black : Theme.cyan)
+                        .background(mia == "arbitro" ? Theme.cyan : Theme.surface, in: RoundedRectangle(cornerRadius: 13))
+                        .overlay(RoundedRectangle(cornerRadius: 13).strokeBorder(Theme.stroke))
+                }
                 Button { scegli("no") } label: {
                     Text("Non partecipo").font(.system(size: 14, weight: .heavy))
                         .frame(maxWidth: .infinity).frame(height: 44)
@@ -805,6 +863,7 @@ struct EventoScheda: View {
                 NavigationLink { SquadreView(evento: e) } label: { etichettaTasto("person.2.fill", "Squadre", "Attacco / Difesa") }.buttonStyle(PressStyle())
             }
             NavigationLink { SpeseView(evento: e) } label: { etichettaTasto("eurosign.circle.fill", "Spese", "chi deve a chi") }.buttonStyle(PressStyle())
+            NavigationLink { ChecklistEventoView(evento: e) } label: { etichettaTasto("checklist", "Cosa porto", "la tua lista, privata") }.buttonStyle(PressStyle())
             tasto("folder.fill", "Documenti", "file dell'evento") { store.scegli(e); documenti = true }
             tasto("bubble.left.and.bubble.right.fill", "Chat", "con chi partecipa") { store.scegli(e); UserDefaults.standard.set(true, forKey: "eventi.apriChat"); tutto = true }
             tasto("ellipsis.circle.fill", "Tutte le funzioni", "video, membri, punti") { store.scegli(e); tutto = true }
@@ -843,6 +902,9 @@ struct EventoScheda: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Risposte").font(.system(size: 15, weight: .heavy))
             NavigationLink { RisposteView(evento: e, presenze: p, filtro: "si") } label: { rigaConta("checkmark.circle", Theme.olive, "\(p.conta.si) partecipano") }
+            if let a = p.conta.arbitro, a > 0 {
+                NavigationLink { RisposteView(evento: e, presenze: p, filtro: "arbitro") } label: { rigaConta("flag.fill", Theme.cyan, "\(a) arbitri") }
+            }
             if let a = p.conta.attesa, a > 0 {
                 NavigationLink { RisposteView(evento: e, presenze: p, filtro: "attesa") } label: { rigaConta("hourglass", Theme.amber, "\(a) in lista d'attesa") }
             }
@@ -935,6 +997,7 @@ struct RisposteView: View {
             let ok: Bool
             switch filtro {
             case "si": ok = p.risposta == "si"
+            case "arbitro": ok = p.risposta == "arbitro"
             case "attesa": ok = p.risposta == "attesa"
             case "no": ok = p.risposta == "no" || p.risposta == "forse"
             case "senza": ok = p.risposta == nil
@@ -947,7 +1010,7 @@ struct RisposteView: View {
     var body: some View {
         VStack(spacing: 0) {
             Picker("", selection: $filtro) {
-                Text("Presenti").tag("si"); Text("Senza risp.").tag("senza"); Text("No").tag("no"); Text("Tutti").tag("tutti")
+                Text("Presenti").tag("si"); Text("Arbitri").tag("arbitro"); Text("Senza risp.").tag("senza"); Text("No").tag("no"); Text("Tutti").tag("tutti")
             }
             .pickerStyle(.segmented).padding(12)
             List(righe) { p in
@@ -958,8 +1021,8 @@ struct RisposteView: View {
                         if let n = p.nome { Text(n).font(.caption).foregroundStyle(Theme.dim) }
                     }
                     Spacer()
-                    Image(systemName: p.risposta == "si" ? "checkmark.circle.fill" : (p.risposta == "attesa" ? "hourglass" : (p.risposta == nil ? "questionmark.circle" : "xmark.circle.fill")))
-                        .foregroundStyle(p.risposta == "si" ? Theme.olive : (p.risposta == nil || p.risposta == "attesa" ? Theme.amber : Theme.red))
+                    Image(systemName: p.risposta == "si" ? "checkmark.circle.fill" : (p.risposta == "arbitro" ? "flag.fill" : (p.risposta == "attesa" ? "hourglass" : (p.risposta == nil ? "questionmark.circle" : "xmark.circle.fill"))))
+                        .foregroundStyle(p.risposta == "si" ? Theme.olive : (p.risposta == "arbitro" ? Theme.cyan : (p.risposta == nil || p.risposta == "attesa" ? Theme.amber : Theme.red)))
                 }
                 .listRowBackground(Theme.surface)
             }
@@ -975,7 +1038,10 @@ struct RisposteView: View {
 // MARK: - Nuovo evento / proposta (con immagine di copertina)
 
 struct NuovoEventoV2: View {
+    var modifica: JEvento? = nil
     @Environment(\.dismiss) var dismiss
+    @State private var pacchetto: Int?
+    @State private var pacchetti: [JPacchetto] = []
     @EnvironmentObject var location: LocationService
     @ObservedObject private var jsoc = JsocClient.shared
     @State private var foto: PhotosPickerItem?
@@ -1057,22 +1123,32 @@ struct NuovoEventoV2: View {
                     }
                 }
                 Section("Descrizione") { TextField("Programma, regolamento, materiale", text: $note, axis: .vertical).lineLimit(3...10) }
+                if modifica == nil && !pacchetti.isEmpty {
+                    Section {
+                        Picker(selection: $pacchetto) {
+                            Text("Nessuno").tag(Int?.none)
+                            ForEach(pacchetti) { p in Text("\(p.nome) · \(p.punti.count)").tag(Int?.some(p.id)) }
+                        } label: { Label("Coordinate dall'archivio", systemImage: "shippingbox") }
+                    } footer: { Text("I punti del pacchetto vengono copiati nella mappa del nuovo evento.") }
+                }
+                if modifica == nil {
                 Section {
                     Toggle(isOn: $nascosto) { Label("Nascosto: lo vedo solo io", systemImage: "eye.slash.fill") }
                 } footer: { Text("Per preparare un evento con calma: nessun altro lo vede finché non lo rendi visibile dalla sua scheda.") }
-                if !direttivo && !nascosto {
+                }
+                if modifica == nil && !direttivo && !nascosto {
                     Section { Label("Lo vedranno tutti dopo l'approvazione del direttivo", systemImage: "checkmark.seal").foregroundStyle(Theme.amber) }
                 }
                 if let errore { Section { Text(errore).foregroundStyle(Theme.red) } }
             }
             .scrollContentBackground(.hidden)
             .background(Theme.bg)
-            .navigationTitle(direttivo ? "Nuovo evento" : "Proponi evento")
+            .navigationTitle(modifica != nil ? "Modifica evento" : (direttivo ? "Nuovo evento" : "Proponi evento"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Annulla") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(direttivo ? "Crea" : "Proponi") { crea() }.disabled(nome.trimmingCharacters(in: .whitespaces).isEmpty || lavoro)
+                    Button(modifica != nil ? "Salva" : (direttivo ? "Crea" : "Proponi")) { crea() }.disabled(nome.trimmingCharacters(in: .whitespaces).isEmpty || lavoro)
                 }
             }
             .onChange(of: foto) { f in
@@ -1080,7 +1156,23 @@ struct NuovoEventoV2: View {
                     if let d = try? await f?.loadTransferable(type: Data.self), let i = UIImage(data: d) { copertina = i }
                 }
             }
+            .onAppear { riempi() }
+            .task { if modifica == nil { pacchetti = (try? await jsoc.pacchetti()) ?? [] } }
         }
+    }
+
+    /// in modifica: i campi partono dall'evento esistente
+    func riempi() {
+        guard let e = modifica, nome.isEmpty else { return }
+        nome = e.nome; tipo = e.tipo; interno = e.interno == 1
+        if let i = e.dataInizio { inizio = i }
+        if let f = e.dataFine { fine = f }
+        luogo = e.luogo ?? ""; note = e.note ?? ""
+        if let s = e.dataScadenza { conScadenza = true; scadenza = s }
+        if let p = e.posti, p > 0 { conPosti = true; posti = p }
+        if let q = e.quota, q > 0 { conQuota = true; quota = String(format: "%.2f", q).replacingOccurrences(of: ".", with: ",") }
+        domande = e.domande ?? []
+        nascosto = e.privato
     }
 
     func crea() {
@@ -1094,9 +1186,29 @@ struct NuovoEventoV2: View {
         if conPosti { campi["posti"] = posti }
         if conQuota, let q = Double(quota.replacingOccurrences(of: ",", with: ".")) { campi["quota"] = q }
         if quiPosizione, let c = location.location?.coordinate { campi["lat"] = c.latitude; campi["lon"] = c.longitude }
+        if let m = modifica {
+            campi.removeValue(forKey: "nascosto")
+            if !conScadenza { campi["scadenza"] = NSNull() }
+            if !conPosti { campi["posti"] = NSNull() }
+            if !conQuota { campi["quota"] = NSNull() }
+            Task {
+                do {
+                    _ = try await jsoc.modificaEvento(m.id, campi)
+                    if let img = copertina, let d = img.ridotta(lato: 1600).jpegData(compressionQuality: 0.75) {
+                        try? await jsoc.caricaDati("/api/eventi/\(m.id)/copertina", dati: d)
+                    }
+                    await EventoStore.shared.aggiorna(jsoc)
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    dismiss()
+                } catch { errore = error.localizedDescription }
+                lavoro = false
+            }
+            return
+        }
         Task {
             do {
                 let e = try await jsoc.creaEvento(campi)
+                if let pacchetto { _ = try? await jsoc.usaPacchetto(pacchetto, evento: e.id) }
                 if let img = copertina, let d = img.ridotta(lato: 1600).jpegData(compressionQuality: 0.75) {
                     try? await jsoc.caricaDati("/api/eventi/\(e.id)/copertina", dati: d)
                 }

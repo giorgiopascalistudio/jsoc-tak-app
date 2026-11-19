@@ -104,7 +104,8 @@ struct EventoRiga: View {
                     switch evento.mia_risposta {
                     case "si": etichetta("CI SONO", Theme.green)
                     case "no": etichetta("NON CI SONO", Theme.red)
-                    case "forse": etichetta("FORSE", Theme.amber)
+                    case "arbitro": etichetta("ARBITRO", Theme.cyan)
+                    case "forse": etichetta("NON CI SONO", Theme.red)
                     default: if evento.fase != 2 { etichetta("DA RISPONDERE", Theme.amber) }
                     }
                 }
@@ -171,12 +172,15 @@ struct EventoView: View {
         .refreshable { await store.aggiorna(jsoc); await caricaPresenze() }
         .fullScreenCover(item: $aperto) { s in
             ZStack(alignment: .topTrailing) {
-                switch s {
-                case .documenti: DocsTab()
-                case .strumenti: CipherTab()
-                case .raccolta: KitTab()
-                case .video: VideoTab()
+                Group {
+                    switch s {
+                    case .documenti: DocsTab()
+                    case .strumenti: CipherTab()
+                    case .raccolta: KitTab()
+                    case .video: VideoTab()
+                    }
                 }
+                .indietro { aperto = nil }
                 Button { aperto = nil } label: {
                     Image(systemName: "xmark.circle.fill").font(.system(size: 28)).symbolRenderingMode(.palette)
                         .foregroundStyle(.white, Theme.surface2)
@@ -306,13 +310,13 @@ struct EventoView: View {
     // MARK: presenze (come Spond)
 
     func presenzeCard(_ p: JPresenze) -> some View {
-        Card(title: "Presenze", icon: "checklist", trailing: "\(p.conta.si) sì · \(p.conta.forse) forse · \(p.conta.no) no") {
-            ForEach(["si", "forse", "no", ""], id: \.self) { r in
-                let lista = p.presenze.filter { ($0.risposta ?? "") == r }
+        Card(title: "Presenze", icon: "checklist", trailing: "\(p.conta.si) sì · \(p.conta.arbitro ?? 0) arbitri · \(p.conta.no + p.conta.forse) no") {
+            ForEach(["si", "arbitro", "no", ""], id: \.self) { r in
+                let lista = p.presenze.filter { r == "no" ? ($0.risposta == "no" || $0.risposta == "forse") : ($0.risposta ?? "") == r }
                 if !lista.isEmpty {
-                    Text(r == "si" ? "CI SONO" : (r == "forse" ? "FORSE" : (r == "no" ? "NON CI SONO" : "NON HANNO RISPOSTO")))
+                    Text(r == "si" ? "CI SONO" : (r == "arbitro" ? "ARBITRI" : (r == "no" ? "NON CI SONO" : "NON HANNO RISPOSTO")))
                         .font(.system(size: 10, weight: .heavy, design: .monospaced)).tracking(1.2)
-                        .foregroundStyle(r == "si" ? Theme.green : (r == "no" ? Theme.red : Theme.amber))
+                        .foregroundStyle(r == "si" ? Theme.green : (r == "no" ? Theme.red : (r == "arbitro" ? Theme.cyan : Theme.amber)))
                     ForEach(lista) { x in
                         HStack {
                             Text(x.callsign).font(Theme.mono(13, .bold))
@@ -585,7 +589,7 @@ struct InvitoSheet: View {
                         .padding(14).background(.white, in: RoundedRectangle(cornerRadius: 16))
                         .frame(maxWidth: 300)
                     Text(i.codice).font(Theme.mono(28, .heavy)).tracking(4).foregroundStyle(Theme.olive)
-                    Text(dispositivo ? "Valido 10 minuti, per un solo dispositivo." : "Valido 7 giorni, per una sola persona. Il socio lo inquadra all'apertura di JSOC TAK.")
+                    Text(dispositivo ? "Valido 30 minuti, per un solo dispositivo." : "Valido 7 giorni, per una sola persona. Il socio lo inquadra all'apertura di JSOC TAK.")
                         .font(.caption).foregroundStyle(Theme.dim).multilineTextAlignment(.center)
                     HStack {
                         Button { UIPasteboard.general.string = i.link; UINotificationFeedbackGenerator().notificationOccurred(.success) } label: {

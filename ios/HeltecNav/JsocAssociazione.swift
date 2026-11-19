@@ -117,7 +117,7 @@ struct JPresenza: Codable, Identifiable, Hashable {
     let presente: Int?
 }
 struct JPresenze: Codable {
-    struct Conta: Codable, Hashable { let si: Int; let no: Int; let forse: Int; let senza_risposta: Int; var attesa: Int? = nil }
+    struct Conta: Codable, Hashable { let si: Int; let no: Int; let forse: Int; let senza_risposta: Int; var attesa: Int? = nil; var arbitro: Int? = nil }
     let presenze: [JPresenza]; let conta: Conta
 }
 
@@ -210,6 +210,10 @@ extension JsocClient {
         try await send("/api/bacheca", "POST", ["titolo": titolo, "testo": testo, "fissato": fissato, "conferma": conferma])
     }
     func commenta(_ post: Int, _ testo: String) async throws -> [JPost] { try await send("/api/bacheca/\(post)/commenti", "POST", ["testo": testo]) }
+    func modificaPost(_ post: Int, titolo: String, testo: String) async throws { let _: JOk = try await send("/api/bacheca/\(post)", "PUT", ["titolo": titolo, "testo": testo]) }
+    func cancellaPost(_ post: Int) async throws { let _: JOk = try await send("/api/bacheca/\(post)", "DELETE", [String: Any]()) }
+    /// testo vuoto = elimina il commento
+    func modificaCommento(_ id: Int, _ testo: String) async throws { let _: JOk = try await send("/api/commenti/\(id)", "PUT", ["testo": testo]) }
     func letto(_ post: Int) async { let _: JOk? = try? await send("/api/bacheca/\(post)/letto", "POST", [String: Any]()) }
     func sondaggi() async throws -> [JSondaggio] { try await get("/api/sondaggi") }
     func nuovoSondaggio(_ domanda: String, _ opzioni: [String], multipla: Bool, anonimo: Bool) async throws -> [JSondaggio] {

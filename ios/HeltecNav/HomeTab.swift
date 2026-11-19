@@ -10,6 +10,9 @@ func vaiAllaScheda(_ i: Int) { NotificationCenter.default.post(name: .vaiTab, ob
 
 enum Schede { static let home = 0, mappa = 1, eventi = 2, associazione = 3, profilo = 4, strumenti = 5 }
 
+/// la scheda da cui si è aperta la mappa: "Esci" torna lì (con l'evento ancora aperto), non alla Home
+enum SchedaPrecedente { static var valore = Schede.home }
+
 // MARK: - Home (dashboard)
 
 @MainActor
@@ -285,7 +288,7 @@ struct RispostaBottoni: View {
     var body: some View {
         HStack(spacing: 8) {
             bottone("si", "Ci sono", "checkmark", Theme.green)
-            bottone("forse", "Forse", "questionmark", Theme.amber)
+            bottone("arbitro", "Arbitro", "flag.fill", Theme.cyan)
             bottone("no", "No", "xmark", Theme.red)
         }
     }

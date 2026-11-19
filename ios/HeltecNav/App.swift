@@ -119,7 +119,10 @@ struct JsocTakApp: App {
             .onReceive(location.$heading.throttle(for: .seconds(2), scheduler: RunLoop.main, latest: true)) { h in
                 if let l = location.location { evento.registra(l, direzione: h) }
             }
-            .onChange(of: tab) { t in Diagnostica.passo("scheda \(t)"); if t != Schede.mappa { ruotaSchermo(.allButUpsideDown) } }
+            .onChange(of: tab) { t in
+                Diagnostica.passo("scheda \(t)")
+                if t != Schede.mappa { ruotaSchermo(.allButUpsideDown); SchedaPrecedente.valore = t }
+            }
             .onReceive(NotificationCenter.default.publisher(for: .vaiTab)) { n in
                 if let t = n.userInfo?["tab"] as? Int { tab = t }
             }

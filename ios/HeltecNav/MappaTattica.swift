@@ -354,10 +354,13 @@ struct MappaTattica: View {
         }
         .fullScreenCover(item: $attrezzo) { a in
             ZStack(alignment: .topTrailing) {
-                switch a {
-                case .cifrari: CipherTab()
-                case .raccolta: KitTab()
+                Group {
+                    switch a {
+                    case .cifrari: CipherTab()
+                    case .raccolta: KitTab()
+                    }
                 }
+                .indietro("Mappa") { attrezzo = nil }
                 Button { attrezzo = nil } label: {
                     Image(systemName: "xmark.circle.fill").font(.system(size: 30)).foregroundStyle(.white, Theme.surface2)
                 }
@@ -932,7 +935,7 @@ struct MappaTattica: View {
         haptic()
         if barraVisibile { nascondiPresto() }
         switch v {
-        case .esci: vaiAllaScheda(Schede.home)
+        case .esci: vaiAllaScheda(SchedaPrecedente.valore)
         case .impostazioni: pannello = pannello == .impostazioni ? nil : .impostazioni
         case .notte: withAnimation(.easeInOut(duration: 0.25)) { night.toggle() }
         case .punto: pannello = .nuovoPunto(ctl.centro.latitude, ctl.centro.longitude)
@@ -941,8 +944,14 @@ struct MappaTattica: View {
         case .squadra: pannello = pannello == .squadra ? nil : .squadra
         case .traccia:
             traccia.attiva.toggle()
-            if !traccia.attiva { traccia.salva() }
-            mostra(traccia.attiva ? "Registrazione traccia avviata" : "Traccia in pausa · \(traccia.testo)")
+            if traccia.attiva {
+                mostra("Registrazione traccia avviata")
+            } else {
+                let t = traccia.testo
+                ArchivioTracce.shared.aggiungi(traccia.punti)
+                traccia.azzera()
+                mostra("Traccia salvata nell'archivio personale · \(t)")
+            }
         case .video:
             if case .video = pannello { pannello = nil } else { pannello = .video(nil) }
         case .livelli: pannello = pannello == .livelli ? nil : .livelli

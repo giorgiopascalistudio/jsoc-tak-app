@@ -77,6 +77,13 @@ struct ProfiloTab: View {
                     }
                 }
             }
+            Section("Personale") {
+                NavigationLink { AttrezzaturaView() } label: { Label("Attrezzatura e accessori", systemImage: "shield.lefthalf.filled") }
+                NavigationLink { ArchivioPersonaleView() } label: { Label("Archivio personale: tracce e coordinate", systemImage: "archivebox.fill") }
+                if let id = jsoc.utente?.id {
+                    NavigationLink { SchedaSocioView(id: id) } label: { Label("La mia scheda: presenze e quote", systemImage: "person.text.rectangle") }
+                }
+            }
             Section("Impostazioni") {
                 Toggle("Condividi posizione e direzione agli eventi", isOn: $store.condividiPosizione)
                 Toggle("Modalità notturna (rosso)", isOn: Binding(get: { night.on }, set: { if $0 != night.on { night.toggle() } }))

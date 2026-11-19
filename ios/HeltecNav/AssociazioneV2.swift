@@ -761,9 +761,12 @@ struct LibroSociView: View {
         List {
             let attivi = soci.filter { $0.attivo == 1 }, ex = soci.filter { $0.attivo == 0 }
             Section("Soci attivi (\(attivi.count))") {
-                ForEach(attivi) { s in riga(s).swipeActions { Button("Uscita") { uscita = s }.tint(Theme.red) } }
+                ForEach(attivi) { s in
+                    NavigationLink { SchedaSocioView(id: s.id) } label: { riga(s) }
+                        .swipeActions { Button("Uscita") { uscita = s }.tint(Theme.red) }
+                }
             }
-            if !ex.isEmpty { Section("Usciti (\(ex.count))") { ForEach(ex) { riga($0) } } }
+            if !ex.isEmpty { Section("Usciti (\(ex.count))") { ForEach(ex) { s in NavigationLink { SchedaSocioView(id: s.id) } label: { riga(s) } } } }
         }
         .listaJSOC().navigationTitle("Libro soci")
         .task { soci = (try? await JsocClient.shared.libroSoci()) ?? [] }

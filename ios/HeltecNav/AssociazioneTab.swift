@@ -116,6 +116,14 @@ struct PostCard: View {
     @State private var commento = ""
     @State private var aperto = false
     @State private var letture: [JLettura]?
+    @State private var modifica = false
+    @State private var titoloM = ""
+    @State private var testoM = ""
+    @State private var chiediElimina = false
+    var mio: Bool { post.autore == JsocClient.shared.utente?.id }
+    var direttivo: Bool { JsocClient.shared.utente?.direttivo == true }
+
+    func ricarica() async { if let p = try? await JsocClient.shared.bacheca() { aggiornato(p) } }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -128,6 +136,12 @@ struct PostCard: View {
                 Spacer()
                 if post.fissato == 1 { Image(systemName: "pin.fill").foregroundStyle(Theme.amber) }
                 if !post.letto { Circle().fill(Theme.olive).frame(width: 8, height: 8) }
+                if mio || direttivo {
+                    Menu {
+                        Button { titoloM = post.titolo ?? ""; testoM = post.testo; modifica = true } label: { Label("Modifica", systemImage: "pencil") }
+                        if direttivo { Button(role: .destructive) { chiediElimina = true } label: { Label("Elimina", systemImage: "trash") } }
+                    } label: { Image(systemName: "ellipsis").padding(6).foregroundStyle(Theme.dim) }
+                }
             }
             if let t = post.titolo, !t.isEmpty { Text(t).font(.headline) }
             Text(post.testo).font(.subheadline)
@@ -161,6 +175,14 @@ struct PostCard: View {
                     HStack(alignment: .top, spacing: 6) {
                         Text(c.callsign ?? "?").font(Theme.mono(11, .bold)).foregroundStyle(Theme.olive)
                         Text(c.testo).font(.caption)
+                        Spacer(minLength: 0)
+                    }
+                    .contextMenu {
+                        if c.autore == JsocClient.shared.utente?.id || direttivo {
+                            Button(role: .destructive) { Task { try? await JsocClient.shared.modificaCommento(c.id, ""); await ricarica() } } label: {
+                                Label("Elimina commento", systemImage: "trash")
+                            }
+                        }
                     }
                 }
                 HStack {
@@ -177,6 +199,28 @@ struct PostCard: View {
         .padding(14)
         .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.surface))
         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(post.chiedeConferma && !post.letto ? Theme.amber : post.fissato == 1 ? Theme.amber.opacity(0.5) : Theme.stroke, lineWidth: post.chiedeConferma && !post.letto ? 1.5 : 0.75))
+        .confirmationDialog("Eliminare l'avviso?", isPresented: $chiediElimina, titleVisibility: .visible) {
+            Button("Elimina", role: .destructive) { Task { try? await JsocClient.shared.cancellaPost(post.id); await ricarica() } }
+        } message: { Text("Spariscono anche commenti e letture.") }
+        .sheet(isPresented: $modifica) {
+            NavigationStack {
+                Form {
+                    TextField("Titolo", text: $titoloM)
+                    TextField("Testo", text: $testoM, axis: .vertical).lineLimit(4...14)
+                }
+                .listaJSOC().navigationTitle("Modifica avviso").navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("Annulla") { modifica = false } }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Salva") {
+                            Task { try? await JsocClient.shared.modificaPost(post.id, titolo: titoloM, testo: testoM); await ricarica(); modifica = false }
+                        }
+                        .disabled(testoM.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
+        }
         .sheet(isPresented: Binding(get: { letture != nil }, set: { if !$0 { letture = nil } })) {
             NavigationStack {
                 List {
@@ -345,6 +389,13 @@ struct SocioView: View {
                 }
             }
             .listRowBackground(Color.clear)
+            if direttivo || PermessiStore.shared.gestione {
+                Section {
+                    NavigationLink { SchedaSocioView(id: socio.id) } label: {
+                        Label("Scheda completa: presenze, quote, tessera, cassa", systemImage: "person.text.rectangle.fill")
+                    }
+                }
+            }
             if direttivo {
                 Section("Anagrafica") {
                     TextField("Nome e cognome", text: $socio.nome)
