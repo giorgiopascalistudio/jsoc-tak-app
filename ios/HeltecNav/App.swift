@@ -2,22 +2,37 @@ import SwiftUI
 import Combine
 import BackgroundTasks
 
+/// I servizi dell'app tenuti fuori dall'osservazione della radice: GPS, bussola, server e missione cambiano
+/// molte volte al secondo e, se la radice li osservasse, ricalcolerebbe tutta l'app a ogni cambiamento (scatti).
+/// Le schermate che ne hanno bisogno li ricevono come environmentObject e osservano solo loro.
+@MainActor
+final class Servizi {
+    let location = LocationService()
+    let log = FieldLog()
+    let docs = DocStore()
+    let server = ServerClient()
+    let terminal = TerminalModel()
+    let claude = ClaudeModel()
+    let rilevamenti = Rilevamenti()
+    let mission = Mission()
+}
+
 @main
 struct JsocTakApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var delegato
-    @StateObject private var location = LocationService()
-    @StateObject private var log = FieldLog()
-    @StateObject private var docs = DocStore()
-    @StateObject private var server = ServerClient()
-    @StateObject private var terminal = TerminalModel()
-    @StateObject private var claude = ClaudeModel()
-    @StateObject private var rilevamenti = Rilevamenti()
+    @State private var servizi = Servizi()
     @StateObject private var night = NightMode()
-    @StateObject private var mission = Mission()
-    @ObservedObject private var jsoc = JsocClient.shared
-    @ObservedObject private var evento = EventoStore.shared
-    @ObservedObject private var home = HomeModel.shared
-    private var avvisiHome: Int { (home.dati?.avvisi ?? []).filter { $0.tipo != "evento" }.count }
+    private var location: LocationService { servizi.location }
+    private var log: FieldLog { servizi.log }
+    private var docs: DocStore { servizi.docs }
+    private var server: ServerClient { servizi.server }
+    private var terminal: TerminalModel { servizi.terminal }
+    private var claude: ClaudeModel { servizi.claude }
+    private var rilevamenti: Rilevamenti { servizi.rilevamenti }
+    private var mission: Mission { servizi.mission }
+    private var jsoc: JsocClient { .shared }
+    private var evento: EventoStore { .shared }
+    private var home: HomeModel { .shared }
     @Environment(\.scenePhase) private var phase
     @State private var tab = UserDefaults.standard.integer(forKey: "debug.tab")   // per le anteprime
 
@@ -27,14 +42,13 @@ struct JsocTakApp: App {
         WindowGroup {
             // Home · Eventi · Associazione · Strumenti (barra in basso, colonna a sinistra in orizzontale);
             // il Profilo si apre dalla Home, la Mappa dagli eventi
-            ContenitoreSchede(tab: $tab, badge: [
-                Schede.home: avvisiHome,
-                Schede.eventi: evento.nonLetti + evento.eventi.filter { $0.fase != 2 && $0.stato != "proposto" && $0.mia_risposta == nil }.count,
-                Schede.associazione: (home.dati?.post_nuovi ?? 0) + (home.dati?.sondaggi_aperti ?? 0),
-            ])
+            ContenitoreSchede(tab: $tab)
             .tint(night.on ? Night.red : Theme.olive)
-            // modalità notturna: tutto moltiplicato per il rosso (il nero resta nero, il bianco diventa rosso)
-            .colorMultiply(night.on ? Night.filtro : .white)
+            // modalità notturna: tutto moltiplicato per il rosso (il nero resta nero, il bianco diventa rosso).
+            // Solo quando è accesa: un filtro su tutta l'app costa un passaggio in più a ogni fotogramma
+            .overlay {
+                if night.on { Night.filtro.blendMode(.multiply).ignoresSafeArea().allowsHitTesting(false) }
+            }
             .background(Theme.bg.ignoresSafeArea())
             .preferredColorScheme(.dark)
             .environment(\.locale, Locale(identifier: "it_IT"))
@@ -78,9 +92,9 @@ struct JsocTakApp: App {
             .onReceive(location.$location.throttle(for: .seconds(15), scheduler: RunLoop.main, latest: true)) { _ in
                 mission.aggiorna(location: location, client: server, claude: claude)
             }
-            .onChange(of: claude.running) { _ in mission.aggiorna(location: location, client: server, claude: claude, force: true) }
-            .onChange(of: mission.fatti) { _ in mission.aggiorna(location: location, client: server, claude: claude, force: true) }
-            .onChange(of: mission.finestra?.code) { _ in mission.aggiorna(location: location, client: server, claude: claude, force: true) }
+            .onReceive(claude.$running.removeDuplicates().dropFirst()) { _ in mission.aggiorna(location: location, client: server, claude: claude, force: true) }
+            .onReceive(mission.$fatti.removeDuplicates().dropFirst()) { _ in mission.aggiorna(location: location, client: server, claude: claude, force: true) }
+            .onReceive(mission.$finestra.map { $0?.code }.removeDuplicates().dropFirst()) { _ in mission.aggiorna(location: location, client: server, claude: claude, force: true) }
             .task {
                 // biblioteca: controlla le novità ogni 2 minuti, anche col telefono bloccato
                 // (l'app resta viva grazie alla posizione in background) -> notifiche
@@ -127,7 +141,7 @@ struct JsocTakApp: App {
             .onReceive(NotificationCenter.default.publisher(for: .vaiTab)) { n in
                 if let t = n.userInfo?["tab"] as? Int { tab = t }
             }
-            .onChange(of: evento.corrente?.id) { _ in
+            .onReceive(EventoStore.shared.$corrente.map { $0?.id }.removeDuplicates().dropFirst()) { _ in
                 docs.cambiaEvento()
                 Task { await docs.sync(jsoc, force: true) }
             }

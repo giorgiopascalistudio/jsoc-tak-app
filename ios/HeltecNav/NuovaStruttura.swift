@@ -48,8 +48,15 @@ struct BarraSchede: View {
 /// Le schede restano in memoria (come una TabView), tranne la mappa che si apre a schermo intero.
 struct ContenitoreSchede: View {
     @Binding var tab: Int
-    var badge: [Int: Int]
+    @ObservedObject private var evento = EventoStore.shared
+    @ObservedObject private var home = HomeModel.shared
     @State private var visti: Set<Int> = []
+
+    var badge: [Int: Int] {
+        [Schede.home: (home.dati?.avvisi ?? []).filter { $0.tipo != "evento" }.count,
+         Schede.eventi: evento.nonLetti + evento.eventi.filter { $0.fase != 2 && $0.stato != "proposto" && $0.mia_risposta == nil }.count,
+         Schede.associazione: (home.dati?.post_nuovi ?? 0) + (home.dati?.sondaggi_aperti ?? 0)]
+    }
 
     var body: some View {
         GeometryReader { g in
@@ -66,15 +73,15 @@ struct ContenitoreSchede: View {
                         if visti.contains(t) || t == tab {
                             vista(t)
                                 .opacity(t == tab ? 1 : 0)
-                                .offset(y: t == tab ? 0 : 8)
                                 .allowsHitTesting(t == tab)
+                                .accessibilityHidden(t != tab)
                         }
                     }
                     if tab == Schede.mappa {
                         MapTab().transition(.opacity)
                     }
                 }
-                .animation(.easeOut(duration: 0.22), value: tab)
+                .animation(.easeOut(duration: 0.15), value: tab)
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     if !land && tab != Schede.mappa {
                         BarraSchede(tab: $tab, verticale: false, badge: badge).padding(.horizontal, 14).padding(.bottom, 2)

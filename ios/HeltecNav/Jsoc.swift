@@ -570,8 +570,11 @@ final class EventoStore: ObservableObject {
         guard j.collegato else { return }
         do {
             let e = try await j.eventi()
-            eventi = e
-            try? JSONEncoder().encode(e).write(to: fileEventi, options: .atomic)
+            // si riassegna solo se cambia: ogni assegnazione fa ridisegnare tutte le schermate che osservano gli eventi
+            if eventi != e {
+                eventi = e
+                try? JSONEncoder().encode(e).write(to: fileEventi, options: .atomic)
+            }
             // evento attivo = uno di cui faccio parte: prima quello in corso, poi il prossimo, poi l'ultimo passato
             let miei = e.filter(\.membro)
             if idCorrente == -1 { if corrente != nil || DatiEvento.aree.isEmpty { apriPersonale() }; return }
@@ -583,9 +586,11 @@ final class EventoStore: ObservableObject {
             }
             guard idCorrente > 0 else { apriPersonale(); return }
             let ev = try await j.evento(idCorrente)
-            applica(ev)
-            try? JSONEncoder().encode(ev).write(to: fileEvento(ev.id), options: .atomic)
-            squadra = (try? await j.squadra(ev.id)) ?? squadra
+            if ev != corrente {
+                applica(ev)
+                try? JSONEncoder().encode(ev).write(to: fileEvento(ev.id), options: .atomic)
+            }
+            if let sq = try? await j.squadra(ev.id), sq != squadra { squadra = sq }
             let nuovi = try await j.messaggi(ev.id, dopo: messaggi.last?.id ?? 0)
             if !nuovi.isEmpty {
                 messaggi += nuovi
@@ -593,9 +598,10 @@ final class EventoStore: ObservableObject {
                 try? JSONEncoder().encode(messaggi).write(to: fileChat(ev.id), options: .atomic)
             }
             await svuotaCoda(j)
-            stato = "Aggiornato alle " + Date().formatted(date: .omitted, time: .shortened)
+            let st = "Aggiornato alle " + Date().formatted(date: .omitted, time: .shortened)
+            if stato != st { stato = st }
         } catch {
-            stato = "Senza rete: dati salvati sul telefono"
+            if stato != "Senza rete: dati salvati sul telefono" { stato = "Senza rete: dati salvati sul telefono" }
         }
     }
 
