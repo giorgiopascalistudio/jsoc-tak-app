@@ -50,7 +50,6 @@ struct ContenitoreSchede: View {
     @Binding var tab: Int
     @ObservedObject private var evento = EventoStore.shared
     @ObservedObject private var home = HomeModel.shared
-    @State private var visti: Set<Int> = []
 
     var badge: [Int: Int] {
         [Schede.home: (home.dati?.avvisi ?? []).filter { $0.tipo != "evento" }.count,
@@ -58,39 +57,45 @@ struct ContenitoreSchede: View {
          Schede.associazione: (home.dati?.post_nuovi ?? 0) + (home.dati?.sondaggi_aperti ?? 0)]
     }
 
+    /// la scheda da mostrare sotto (la mappa si apre sopra, a schermo intero)
+    var selezione: Binding<Int> {
+        Binding(get: { tab == Schede.mappa ? SchedaPrecedente.valore : tab }, set: { tab = $0 })
+    }
+
     var body: some View {
         GeometryReader { g in
             let land = g.size.width > g.size.height
-            HStack(spacing: 0) {
-                if land && tab != Schede.mappa {
-                    // in orizzontale la barra diventa una colonna stretta a sinistra
-                    BarraSchede(tab: $tab, verticale: true, badge: badge)
-                        .padding(.leading, 6).padding(.vertical, 8)
-                        .frame(maxHeight: .infinity)
-                }
-                ZStack {
-                    ForEach([Schede.home, Schede.eventi, Schede.associazione, Schede.strumenti, Schede.profilo], id: \.self) { t in
-                        if visti.contains(t) || t == tab {
+            ZStack {
+                HStack(spacing: 0) {
+                    if land {
+                        // in orizzontale la barra diventa una colonna stretta a sinistra
+                        BarraSchede(tab: $tab, verticale: true, badge: badge)
+                            .padding(.leading, 6).padding(.vertical, 8)
+                            .frame(maxHeight: .infinity)
+                    }
+                    // TabView nativo (senza la sua barra): disegna solo la scheda visibile e tiene lo stato delle altre.
+                    // Prima tutte le schede restavano disegnate una sopra l'altra, trasparenti: era la causa degli scatti.
+                    TabView(selection: selezione) {
+                        ForEach([Schede.home, Schede.eventi, Schede.associazione, Schede.strumenti, Schede.profilo], id: \.self) { t in
                             vista(t)
-                                .opacity(t == tab ? 1 : 0)
-                                .allowsHitTesting(t == tab)
-                                .accessibilityHidden(t != tab)
+                                .tag(t)
+                                .toolbar(.hidden, for: .tabBar)
                         }
                     }
-                    if tab == Schede.mappa {
-                        MapTab().transition(.opacity)
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        if !land {
+                            BarraSchede(tab: $tab, verticale: false, badge: badge).padding(.horizontal, 14).padding(.bottom, 2)
+                        }
                     }
                 }
-                .animation(.easeOut(duration: 0.15), value: tab)
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    if !land && tab != Schede.mappa {
-                        BarraSchede(tab: $tab, verticale: false, badge: badge).padding(.horizontal, 14).padding(.bottom, 2)
-                    }
+                if tab == Schede.mappa {
+                    MapTab()
+                        .background(Color.black.ignoresSafeArea())
+                        .transition(.opacity)
                 }
             }
+            .animation(.easeOut(duration: 0.18), value: tab == Schede.mappa)
         }
-        .onAppear { visti.insert(tab) }
-        .onChange(of: tab) { visti.insert($0) }
     }
 
     @ViewBuilder func vista(_ t: Int) -> some View {
