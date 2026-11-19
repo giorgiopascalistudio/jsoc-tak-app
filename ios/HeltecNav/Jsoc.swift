@@ -242,8 +242,16 @@ final class JsocClient: ObservableObject {
         guard let c = URLComponents(string: t), c.scheme == "jsoctak" else { return nil }
         let q = Dictionary((c.queryItems ?? []).map { ($0.name, $0.value ?? "") }, uniquingKeysWith: { a, _ in a })
         guard let u = q["u"], !u.isEmpty, let cod = q["c"], !cod.isEmpty else { return nil }
-        if let a = q["a"], !a.isEmpty { UserDefaults.standard.set(a.hasSuffix("/") ? String(a.dropLast()) : a, forKey: "jsoc.url2") }
         return (u, cod)
+    }
+
+    /// salva l'indirizzo di riserva dell'invito. NON va chiamata dentro `body`: scrivere le impostazioni
+    /// mentre si disegna la schermata la fa ridisegnare all'infinito (era il blocco su iPad)
+    static func salvaAlternativo(_ s: String) {
+        guard let c = URLComponents(string: s.trimmingCharacters(in: .whitespacesAndNewlines)), c.scheme == "jsoctak",
+              let a = c.queryItems?.first(where: { $0.name == "a" })?.value, !a.isEmpty else { return }
+        let v = a.hasSuffix("/") ? String(a.dropLast()) : a
+        if UserDefaults.standard.string(forKey: "jsoc.url2") != v { UserDefaults.standard.set(v, forKey: "jsoc.url2") }
     }
 
     func entra(indirizzo u: String, codice: String, nome: String, callsign: String) async throws {

@@ -440,6 +440,7 @@ struct EntraView: View {
                     let (u, c) = inv
                     lavoro = true; errore = nil
                     Diagnostica.passo("entra")
+                    JsocClient.salvaAlternativo(link)
                     Task {
                         do {
                             try await jsoc.entra(indirizzo: u, codice: c, nome: nome, callsign: callsign)
