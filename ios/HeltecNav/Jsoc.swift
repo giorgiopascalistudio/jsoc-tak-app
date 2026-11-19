@@ -214,6 +214,26 @@ final class JsocClient: ObservableObject {
                 .serverCertificateHasUnknownRoot, .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed, .clientCertificateRejected].contains(u.code)
     }
 
+    /// Il server dice qual è il suo indirizzo pubblico (raggiungibile anche senza Tailscale):
+    /// se è diverso da quello con cui siamo entrati, ci passo e tengo il vecchio come strada di riserva.
+    func aggiornaIndirizzo() async {
+        guard collegato, let u = URL(string: indirizzo + "/api/stato") else { return }
+        struct Stato: Decodable { let indirizzo: String? }
+        var r = URLRequest(url: u, timeoutInterval: 10)
+        r.cachePolicy = .reloadIgnoringLocalCacheData
+        guard let (d, _) = try? await URLSession.shared.data(for: r),
+              let s = try? JSONDecoder().decode(Stato.self, from: d),
+              var nuovo = s.indirizzo, !nuovo.isEmpty else { return }
+        if nuovo.hasSuffix("/") { nuovo.removeLast() }
+        guard nuovo != indirizzo, let prova = URL(string: nuovo + "/api/stato"),
+              let (_, resp) = try? await URLSession.shared.data(for: URLRequest(url: prova, timeoutInterval: 10)),
+              (resp as? HTTPURLResponse)?.statusCode == 200 else { return }
+        if alternativo.isEmpty { UserDefaults.standard.set(indirizzo, forKey: "jsoc.url2") }
+        indirizzo = nuovo
+        UserDefaults.standard.set(nuovo, forKey: "jsoc.url")
+        Diagnostica.passo("indirizzo pubblico")
+    }
+
     /// passa all'altra strada (e ci resta) se quella attuale non funziona
     private func cambiaStrada(_ r: URLRequest) -> URLRequest? {
         let alt = alternativo
