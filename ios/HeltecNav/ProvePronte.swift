@@ -36,7 +36,7 @@ enum TipoProva: String, CaseIterable, Identifiable, Codable {
     var nome: String {
         switch self {
         case .fili: return "Disinnesca la bomba"
-        case .simboli: return "Tastierino a simboli"
+        case .simboli: return "TastierinoProva a simboli"
         case .lucchetto: return "Lucchetto a enigmi"
         case .cifrario: return "Messaggio cifrato"
         case .sequenza: return "Sequenze logiche"
@@ -559,7 +559,7 @@ struct ProvaFili: View {
     }
 }
 
-// MARK: - 2. Tastierino a simboli
+// MARK: - 2. TastierinoProva a simboli
 
 struct DatiSimboli {
     static let insieme = ["star.fill", "moon.fill", "sun.max.fill", "bolt.fill", "flame.fill", "drop.fill", "leaf.fill", "snowflake",
@@ -733,7 +733,7 @@ struct ProvaLucchetto: View {
                             .background(Theme.surface2, in: RoundedRectangle(cornerRadius: 10))
                     }
                 }
-                Tastierino { n in
+                TastierinoProva { n in
                     Suoni.tasto()
                     if n == -1 { if !cifre.isEmpty { cifre.removeLast() } ; return }
                     guard cifre.count < d.codice.count else { return }
@@ -752,7 +752,7 @@ struct ProvaLucchetto: View {
     }
 }
 
-struct Tastierino: View {
+struct TastierinoProva: View {
     var premi: (Int) -> Void
     var body: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
@@ -774,7 +774,7 @@ struct Tastierino: View {
 
 // MARK: - 4. Messaggio cifrato
 
-enum Alfabeto {
+enum AlfabetoProve {
     static let lettere = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
     static let nato = ["Alfa", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel", "India", "Juliett", "Kilo", "Lima", "Mike",
                        "November", "Oscar", "Papa", "Quebec", "Romeo", "Sierra", "Tango", "Uniform", "Victor", "Whiskey", "X-ray", "Yankee", "Zulu"]
@@ -811,27 +811,27 @@ struct DatiCifrario {
         var sp: [String] = []
         switch m {
         case .nato:
-            c = p.map { Alfabeto.nato[Alfabeto.indice($0) ?? 0] }.joined(separator: " ")
-            sp = ["Alfabeto fonetico NATO: ogni parola è la sua iniziale."]
+            c = p.map { AlfabetoProve.nato[AlfabetoProve.indice($0) ?? 0] }.joined(separator: " ")
+            sp = ["AlfabetoProve fonetico NATO: ogni parola è la sua iniziale."]
         case .cesare(let k):
-            c = String(p.map { Alfabeto.sposta($0, k) })
+            c = String(p.map { AlfabetoProve.sposta($0, k) })
             sp = ["Cifrario di Cesare: ogni lettera è stata spostata AVANTI di \(k) posizioni.", "Per decifrare sposta ogni lettera INDIETRO di \(k)."]
         case .cesareNascosto(let k, let parola):
-            c = String(p.map { Alfabeto.sposta($0, k) })
+            c = String(p.map { AlfabetoProve.sposta($0, k) })
             sp = ["Cifrario di Cesare: ogni lettera è stata spostata avanti.",
                   parola.isEmpty ? "La chiave è il numero di mesi dell'anno meno \(12 - k)." : "La chiave è il numero di lettere della parola \"\(parola)\"."]
         case .numeri(let k):
-            c = p.map { String((Alfabeto.indice($0) ?? 0) + 1 + k) }.joined(separator: " ")
+            c = p.map { String((AlfabetoProve.indice($0) ?? 0) + 1 + k) }.joined(separator: " ")
             sp = [k == 0 ? "Ogni numero è la posizione della lettera nell'alfabeto: A=1, B=2 … Z=26." : "Ogni numero è la posizione della lettera nell'alfabeto (A=1 … Z=26) PIÙ \(k)."]
         case .atbash:
-            c = String(p.map { Alfabeto.lettere[25 - (Alfabeto.indice($0) ?? 0)] })
+            c = String(p.map { AlfabetoProve.lettere[25 - (AlfabetoProve.indice($0) ?? 0)] })
             sp = ["Atbash: l'alfabeto è rovesciato. A↔Z, B↔Y, C↔X, D↔W …"]
         case .morse:
-            c = p.map { Alfabeto.morse[Alfabeto.indice($0) ?? 0] }.joined(separator: "  /  ")
+            c = p.map { AlfabetoProve.morse[AlfabetoProve.indice($0) ?? 0] }.joined(separator: "  /  ")
             sp = ["Codice Morse: le lettere sono separate da /."]
         case .vigenere(let chiave):
             let k = Array(chiave)
-            c = String(p.enumerated().map { i, ch in Alfabeto.sposta(ch, Alfabeto.indice(k[i % k.count]) ?? 0) })
+            c = String(p.enumerated().map { i, ch in AlfabetoProve.sposta(ch, AlfabetoProve.indice(k[i % k.count]) ?? 0) })
             sp = ["Vigenère con chiave \"\(chiave)\": la chiave si ripete sotto il messaggio (\(chiave)\(chiave)…).",
                   "Ogni lettera è stata spostata avanti del valore della lettera di chiave sotto di lei (A=0, B=1 … Z=25).",
                   "Per decifrare: sposta INDIETRO ogni lettera del valore della sua lettera di chiave."]
@@ -841,10 +841,10 @@ struct DatiCifrario {
 
     var tabella: String {
         switch metodo {
-        case .nato: return zip(Alfabeto.lettere, Alfabeto.nato).map { "\($0) \($1)" }.joined(separator: " · ")
-        case .morse: return zip(Alfabeto.lettere, Alfabeto.morse).map { "\($0) \($1)" }.joined(separator: "   ")
+        case .nato: return zip(AlfabetoProve.lettere, AlfabetoProve.nato).map { "\($0) \($1)" }.joined(separator: " · ")
+        case .morse: return zip(AlfabetoProve.lettere, AlfabetoProve.morse).map { "\($0) \($1)" }.joined(separator: "   ")
         default:
-            return Alfabeto.lettere.enumerated().map { i, c in "\(c)=\(i)" }.joined(separator: " ")
+            return AlfabetoProve.lettere.enumerated().map { i, c in "\(c)=\(i)" }.joined(separator: " ")
         }
     }
 }
@@ -953,7 +953,7 @@ struct ProvaSequenze: View {
                     .padding(16).frame(maxWidth: .infinity).background(Color.black, in: RoundedRectangle(cornerRadius: 12))
                     .minimumScaleFactor(0.5)
                 Text(risposta.isEmpty ? "–" : risposta).font(.system(size: 34, weight: .heavy, design: .monospaced))
-                Tastierino { k in
+                TastierinoProva { k in
                     Suoni.tasto()
                     if k == -1 { if !risposta.isEmpty { risposta.removeLast() }; return }
                     if risposta.count < 6 { risposta.append(String(k)) }
@@ -1172,8 +1172,8 @@ struct ProvaQuiz: View {
 struct ManualeCampo: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sezione("Alfabeto NATO", zip(Alfabeto.lettere, Alfabeto.nato).map { "\($0) \($1)" }.joined(separator: " · "))
-            sezione("Morse", zip(Alfabeto.lettere, Alfabeto.morse).map { "\($0) \($1)" }.joined(separator: "   "))
+            sezione("AlfabetoProve NATO", zip(AlfabetoProve.lettere, AlfabetoProve.nato).map { "\($0) \($1)" }.joined(separator: " · "))
+            sezione("Morse", zip(AlfabetoProve.lettere, AlfabetoProve.morse).map { "\($0) \($1)" }.joined(separator: "   "))
             sezione("Radio", "ROGER ricevuto · WILCO ricevuto ed eseguirò · OVER passo · OUT fine, nessuna risposta · SAY AGAIN ripeti · WAIT attendere · AFFIRMATIVE / NEGATIVE sì / no · BREAK pausa nel messaggio")
             sezione("MARCH", "M emorragia massiva (laccio sopra la ferita) · A vie aeree · R respirazione · C circolazione · H ipotermia e trauma cranico")
             sezione("Azimut", "000 N · 045 NE · 090 E · 135 SE · 180 S · 225 SO · 270 O · 315 NO. Ritorno: ± 180°.")
@@ -1407,8 +1407,8 @@ struct DatiRadio {
         frequenza = scelta.1
         tabella = tab
         lampeggia = l == .difficile
-        messaggio = l == .facile ? parola.map { Alfabeto.nato[Alfabeto.indice($0) ?? 0] }.joined(separator: " ")
-                                 : parola.map { Alfabeto.morse[Alfabeto.indice($0) ?? 0] }.joined(separator: "  /  ")
+        messaggio = l == .facile ? parola.map { AlfabetoProve.nato[AlfabetoProve.indice($0) ?? 0] }.joined(separator: " ")
+                                 : parola.map { AlfabetoProve.morse[AlfabetoProve.indice($0) ?? 0] }.joined(separator: "  /  ")
     }
 }
 
@@ -1450,7 +1450,7 @@ struct ProvaRadio: View {
                     HStack { Text(r.0).font(Theme.mono(14, .bold)); Spacer(); Text(String(format: "%.3f", r.1)).font(Theme.mono(14)) }
                 }
                 Text("Morse").font(.system(size: 12, weight: .heavy)).foregroundStyle(Theme.amber).padding(.top, 4)
-                Text(zip(Alfabeto.lettere, Alfabeto.morse).map { "\($0) \($1)" }.joined(separator: "   ")).font(Theme.mono(12)).fixedSize(horizontal: false, vertical: true)
+                Text(zip(AlfabetoProve.lettere, AlfabetoProve.morse).map { "\($0) \($1)" }.joined(separator: "   ")).font(Theme.mono(12)).fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -1469,7 +1469,7 @@ struct ProvaRadio: View {
         lampeggio = true
         Task {
             for ch in d.parola {
-                for simbolo in Alfabeto.morse[Alfabeto.indice(ch) ?? 0] {
+                for simbolo in AlfabetoProve.morse[AlfabetoProve.indice(ch) ?? 0] {
                     luce = true
                     try? await Task.sleep(nanoseconds: simbolo == "." ? 220_000_000 : 650_000_000)
                     luce = false
