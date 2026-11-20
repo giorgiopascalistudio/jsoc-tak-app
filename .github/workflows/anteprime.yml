@@ -19,7 +19,7 @@ jobs:
         run: |
           xcodegen generate
           xcodebuild -project HeltecNav.xcodeproj -scheme HeltecNav -configuration Debug -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' -derivedDataPath dd CODE_SIGNING_ALLOWED=NO build > build.log 2>&1 || {
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath dd CODE_SIGNING_ALLOWED=NO ARCHS=arm64 EXCLUDED_ARCHS=x86_64 build > build.log 2>&1 || {
               grep -E "error:|Undefined|ld: " build.log | sort -u | head -80; exit 1; }
       - name: Schermate (dati di prova, niente server)
         working-directory: ios
