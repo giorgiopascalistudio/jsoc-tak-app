@@ -3,7 +3,9 @@ import PhotosUI
 
 // MARK: - Scheda Profilo
 
-struct ProfiloTab: View {
+/// Moduli dei miei dati e della salute (dai riquadri del Profilo). Da rifare sulle tavole 33-36.
+struct MieiDatiView: View {
+    var salute = false
     @ObservedObject private var jsoc = JsocClient.shared
     @ObservedObject private var store = EventoStore.shared
     @EnvironmentObject var night: NightMode
@@ -19,26 +21,20 @@ struct ProfiloTab: View {
     @State private var esci = false
 
     var body: some View {
-        let _ = Contatori.disegno("ProfiloTab")
-        NavigationStack {
-            Group {
-                if jsoc.collegato { contenuto } else { EntraView() }
-            }
-            .background(Theme.bg.ignoresSafeArea())
-            .navigationTitle("Profilo")
+        Group {
+            if jsoc.collegato { contenuto } else { EntraView() }
         }
+        .background(Theme.bg.ignoresSafeArea())
+        .navigationTitle(salute ? "Salute" : "I miei dati")
         .sheet(isPresented: $invito) { InvitoSheet() }
         .sheet(isPresented: $collega) { InvitoSheet(dispositivo: true) }
     }
 
     var contenuto: some View {
         Form {
-            Section { tesseraDigitale }
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets())
             if let errore { Section { Text(errore).foregroundStyle(Theme.red) } }
             if p != nil {
-                Section("I miei dati") {
+                if !salute { Section("I miei dati") {
                     TextField("Nome e cognome", text: bind(\.nome))
                     TextField("Email", text: bindOpt(\.email)).keyboardType(.emailAddress).textInputAutocapitalization(.never)
                     TextField("Telefono", text: bindOpt(\.telefono)).keyboardType(.phonePad)
@@ -46,8 +42,8 @@ struct ProfiloTab: View {
                     TextField("Luogo di nascita", text: bindOpt(\.luogo_nascita))
                     TextField("Codice fiscale", text: bindOpt(\.cf)).textInputAutocapitalization(.characters)
                     TextField("Indirizzo", text: bindOpt(\.indirizzo))
-                }
-                Section("Certificato medico") {
+                } }
+                if salute { Section("Certificato medico") {
                     Toggle("Ho il certificato", isOn: $haCertificato.animation())
                     if haCertificato {
                         DatePicker("Scade il", selection: $certificato, displayedComponents: .date)
@@ -57,50 +53,13 @@ struct ProfiloTab: View {
                     TextField("Gruppo sanguigno", text: bindOpt(\.gruppo_sanguigno))
                     TextField("Contatto di emergenza (nome e telefono)", text: bindOpt(\.emergenza))
                     TextField("Note (allergie, farmaci)", text: bindOpt(\.note_profilo), axis: .vertical)
-                }
+                } }
                 Section {
                     Button(salvato ? "Salvato ✓" : "Salva i miei dati") { salva() }
                         .frame(maxWidth: .infinity)
                         .buttonStyle(PrimaryButtonStyle())
                 }
                 .listRowBackground(Color.clear)
-                if let q = p?.quote, !q.isEmpty {
-                    Section("Le mie quote") {
-                        ForEach(q, id: \.anno) { x in
-                            HStack {
-                                Text(String(x.anno)).font(Theme.mono(14, .bold))
-                                Spacer()
-                                Text(euro(x.importo)).font(Theme.mono(13))
-                                Text(x.pagata == 1 ? "PAGATA" : "DA PAGARE").font(Theme.mono(11, .heavy))
-                                    .foregroundStyle(x.pagata == 1 ? Theme.green : Theme.amber)
-                            }
-                        }
-                    }
-                }
-            }
-            Section("Personale") {
-                NavigationLink { AttrezzaturaView() } label: { Label("Attrezzatura e accessori", systemImage: "shield.lefthalf.filled") }
-                NavigationLink { ArchivioPersonaleView() } label: { Label("Archivio personale: tracce e coordinate", systemImage: "archivebox.fill") }
-                if let id = jsoc.utente?.id {
-                    NavigationLink { SchedaSocioView(id: id) } label: { Label("La mia scheda: presenze e quote", systemImage: "person.text.rectangle") }
-                }
-            }
-            Section("Impostazioni") {
-                Toggle("Condividi posizione e direzione agli eventi", isOn: $store.condividiPosizione)
-                Toggle("Modalità notturna (rosso)", isOn: Binding(get: { night.on }, set: { if $0 != night.on { night.toggle() } }))
-                NavigationLink("Server e collegamento") { ServerInfoView() }
-            }
-            if jsoc.utente?.direttivo == true {
-                Section("Direttivo") {
-                    Button { invito = true } label: { Label("Invita un nuovo socio (QR)", systemImage: "qrcode") }
-                }
-            }
-            Section {
-                Button { collega = true } label: { Label("Collega un altro dispositivo (iPad)", systemImage: "ipad.and.iphone") }
-            } footer: { Text("Mostra un QR: lo inquadri dall'altro dispositivo ed entri con lo stesso profilo.") }
-            OrologioGarminSezione()
-            Section {
-                Button("Esci da questo telefono", role: .destructive) { esci = true }
             }
         }
         .listaJSOC()

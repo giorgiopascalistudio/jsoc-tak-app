@@ -22,7 +22,7 @@ extension Notification.Name {
 /// tavola: "Dom 22 nov · 08:30 · Campo Calimera · 12 partecipano"
 func testoQuando(_ e: JEvento) -> String {
     var p: [String] = []
-    if let d = e.dataInizio { p.append(FormatiHome.giornoBreve.string(from: d).capitalized(with: Locale(identifier: "it_IT"))) }
+    if let d = e.dataInizio { p.append(FormatiHome.giornoBreve.string(from: d).prefix(1).uppercased() + FormatiHome.giornoBreve.string(from: d).dropFirst()) }
     if let l = e.luogo, !l.isEmpty { p.append(l) }
     if let n = e.n_si, n > 0 { p.append("\(n) partecipano") }
     return p.joined(separator: " · ")
@@ -103,7 +103,7 @@ struct HomeV3: View {
             }
             .padding(.horizontal, 14)
             .padding(.top, 8)
-            .padding(.bottom, 26)      // 14 sopra la barra (che scende di 12)
+            .padding(.bottom, 62)      // tavola: il corpo finisce 96 pt dal fondo (34 sono la barretta di sistema)
         }
     }
 

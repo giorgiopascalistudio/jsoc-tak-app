@@ -52,6 +52,7 @@ jobs:
             shot eventi 6 -debug.tab 2 $L
             shot associazione 6 -debug.tab 3 $L
             shot strumenti 6 -debug.tab 5 $L
+            shot profilo 8 -debug.tab 4 $L
             xcrun simctl shutdown "$DEV" || true
           done
           ls shots

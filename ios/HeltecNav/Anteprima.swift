@@ -39,4 +39,22 @@ enum Anteprima {
                  JHome.Avviso(tipo: "avviso", testo: "Certificato medico", evento: nil, destra: "scade tra 18 g")],
         post_nuovi: 1, sondaggi_aperti: 1, soci_attivi: 18,
         direttivo: JHome.Direttivo(quote_da_incassare: 3, saldo: 412.30, certificati_scaduti: 1, proposte: 0))
+
+    static var profilo: JProfilo {
+        var p = JProfilo(id: 1, nome: "Giorgio Pascali", callsign: "GREG", ruolo: "direttivo")
+        p.email = "giorgio@esempio.it"; p.telefono = "+39 333 1234567"; p.nascita = "1990-03-12"; p.luogo_nascita = "Lecce"
+        p.cf = "PSCGRG90C12E506X"; p.gruppo_sanguigno = "A+"; p.emergenza = "Maria R. +39 333 7654321"
+        p.certificato_scadenza = String(giorno(18, 0).prefix(10))
+        p.quote = [JQuotaMia(anno: Calendar.current.component(.year, from: Date()) + 1, importo: 40, pagata: 0, data: nil)]
+        return p
+    }
+
+    static var scheda: JSchedaSocio {
+        var s = JSchedaSocio(id: 1, nome: "Giorgio Pascali", callsign: "GREG", ruolo: "direttivo")
+        s.carica = "Presidente"; s.ammesso = "2019-04-01"
+        s.tesseramenti = [JSchedaSocio.Tessera(anno: Calendar.current.component(.year, from: Date()), figt: 1, intranet: 1, numero: nil, note: nil)]
+        s.statistiche = JSchedaSocio.Stat(eventi: 18, presenze: 14, arbitro: 1, percentuale: 78)
+        s.dispositivi = [JSchedaSocio.Disp(nome: "iPhone", creato: nil), JSchedaSocio.Disp(nome: "iPad", creato: nil)]
+        return s
+    }
 }
