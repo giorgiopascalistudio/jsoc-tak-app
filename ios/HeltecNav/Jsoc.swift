@@ -106,18 +106,25 @@ struct JEvento: Codable, Identifiable, Hashable {
     var dataInizio: Date? { JEvento.data(inizio) }
     var dataFine: Date? { JEvento.data(fine) }
 
+    /// Le date arrivano come testo. Prima ogni lettura creava 2-3 formattatori nuovi (costosi): il calendario della Home
+    /// ne faceva centinaia a ogni ridisegno ed era la causa dei blocchi di 0,2-0,3 s. Ora formattatori fissi + cache.
+    private static let lockDate = NSLock()
+    private static var cacheDate: [String: Date?] = [:]
+    private static let iso1 = ISO8601DateFormatter()
+    private static let iso2: ISO8601DateFormatter = { let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; return f }()
+    private static let formati: [DateFormatter] = ["yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd'T'HH:mm", "yyyy-MM-dd HH:mm", "yyyy-MM-dd"].map { fmt in
+        let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = fmt; return f
+    }
+
     static func data(_ s: String?) -> Date? {
         guard let s, !s.isEmpty else { return nil }
-        let iso = ISO8601DateFormatter()
-        if let d = iso.date(from: s) { return d }
-        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let d = iso.date(from: s) { return d }
-        let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX")
-        for fmt in ["yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd'T'HH:mm", "yyyy-MM-dd HH:mm", "yyyy-MM-dd"] {
-            f.dateFormat = fmt
-            if let d = f.date(from: s) { return d }
-        }
-        return nil
+        lockDate.lock(); defer { lockDate.unlock() }
+        if let c = cacheDate[s] { return c }
+        var d = iso1.date(from: s) ?? iso2.date(from: s)
+        if d == nil { for f in formati { if let x = f.date(from: s) { d = x; break } } }
+        if cacheDate.count > 5000 { cacheDate.removeAll() }
+        cacheDate[s] = d
+        return d
     }
 
     /// in corso, prossimo o passato rispetto ad adesso

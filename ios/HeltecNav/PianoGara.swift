@@ -1,8 +1,10 @@
 import SwiftUI
 import CoreLocation
 
+enum FormatoOra { static let f: DateFormatter = { let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "HH:mm"; return f }() }
+
 func oraHHmm(_ d: Date) -> String {
-    let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "HH:mm"
+    let f = FormatoOra.f
     return f.string(from: d)
 }
 

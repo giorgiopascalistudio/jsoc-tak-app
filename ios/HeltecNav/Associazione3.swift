@@ -193,10 +193,10 @@ struct DomandaIscrizioneView: View {
     }
 }
 
-func oraISO(_ d: Date) -> String { let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd"; return f.string(from: d) }
+func oraISO(_ d: Date) -> String { FormatoGiorno.f.string(from: d) }
 extension ISO8601DateFormatter {
     static func soloData(_ s: String) -> Date? {
-        let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd"
+        let f = FormatoGiorno.f
         return f.date(from: String(s.prefix(10)))
     }
 }

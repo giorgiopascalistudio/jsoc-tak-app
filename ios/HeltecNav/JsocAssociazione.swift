@@ -31,22 +31,25 @@ struct JProfilo: Codable, Hashable, Identifiable {
     var giorniTessera: Int? { giorniA(tessera_scadenza) }
 }
 
+/// formattatore unico per "yyyy-MM-dd" (crearne uno a ogni riga di un elenco rallenta i ridisegni)
+enum FormatoGiorno { static let f: DateFormatter = { let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd"; return f }() }
+
 func giorniA(_ s: String?) -> Int? {
     guard let s, s.count >= 10 else { return nil }
-    let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd"
+    let f = FormatoGiorno.f
     guard let d = f.date(from: String(s.prefix(10))) else { return nil }
     return Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: Date()), to: d).day
 }
 
 func dataIT(_ s: String?) -> String {
     guard let s, s.count >= 10 else { return "—" }
-    let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd"
+    let f = FormatoGiorno.f
     guard let d = f.date(from: String(s.prefix(10))) else { return s }
     return d.formatted(.dateTime.day().month(.twoDigits).year())
 }
 
 func isoGiorno(_ d: Date) -> String {
-    let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd"
+    let f = FormatoGiorno.f
     return f.string(from: d)
 }
 

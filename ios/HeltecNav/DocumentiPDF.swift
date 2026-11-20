@@ -54,7 +54,7 @@ func dataIta(_ s: String?) -> String {
     let p = s.prefix(10).split(separator: "-")
     return p.count == 3 ? "\(p[2])/\(p[1])/\(p[0])" : s
 }
-func oggiISO() -> String { let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd"; return f.string(from: Date()) }
+func oggiISO() -> String { FormatoGiorno.f.string(from: Date()) }
 func euroTesto(_ v: Double) -> String { String(format: "%.2f", v).replacingOccurrences(of: ".", with: ",") }
 
 /// importo in lettere, come si scrive sulle ricevute: 50 → "cinquanta/00"
