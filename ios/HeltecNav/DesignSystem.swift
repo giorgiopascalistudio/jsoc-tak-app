@@ -279,7 +279,10 @@ struct TailscaleBanner: View {
 /// Le card entrano una dopo l'altra: salgono, si ingrandiscono e si accendono (indice = ordine di entrata).
 /// interruttori decisi dal server (arrivano con /api/stato all'avvio): si cambiano senza ricompilare
 enum ConfigApp {
+    /// comparsa a cascata di schede e righe (pesante)
     static var animazioni: Bool { UserDefaults.standard.object(forKey: "cfg.animazioni") as? Bool ?? true }
+    /// passaggio tra sezioni e pastiglia della barra (leggero)
+    static var schede: Bool { UserDefaults.standard.object(forKey: "cfg.schede") as? Bool ?? true }
 }
 
 struct Comparsa: ViewModifier {

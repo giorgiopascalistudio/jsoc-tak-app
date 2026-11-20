@@ -305,7 +305,7 @@ final class JsocClient: ObservableObject {
         UserDefaults.standard.set(base, forKey: "jsoc.url")
         Keychain.set(ris.gettone, for: "jsoc.gettone")
         salvaUtente(ris.utente)
-        online = true
+        if !online { online = true }
     }
 
     func esci() {
@@ -316,6 +316,7 @@ final class JsocClient: ObservableObject {
     }
 
     private func salvaUtente(_ u: JUtente) {
+        guard utente != u else { return }
         utente = u
         if let d = try? JSONEncoder().encode(u) { UserDefaults.standard.set(d, forKey: "jsoc.utente") }
     }
@@ -342,10 +343,10 @@ final class JsocClient: ObservableObject {
             if riprova, Self.erroreDiStrada(error), let altra = cambiaStrada(r) {
                 return try await esegui(altra, riprova: false)
             }
-            online = false
+            if online { online = false }
             throw JsocErrore.rete(error.localizedDescription)
         }
-        online = true
+        if !online { online = true }
         let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(code) else {
             let msg = (try? JSONDecoder().decode(JErrore.self, from: data))?.errore ?? "errore \(code)"
