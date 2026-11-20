@@ -210,7 +210,7 @@ final class JsocClient: ObservableObject {
     @Published var ultimoErrore: String?
     private var gettone: String = Keychain.get("jsoc.gettone") ?? ""
 
-    var collegato: Bool { !gettone.isEmpty && URL(string: indirizzo) != nil }
+    var collegato: Bool { Anteprima.attiva || (!gettone.isEmpty && URL(string: indirizzo) != nil) }
 
     /// Seconda strada verso il server, dentro Tailscale ma per indirizzo numerico: serve ai dispositivi
     /// su cui il nome del server non si risolve (DNS di Tailscale spento) e danno errore TLS.
@@ -263,6 +263,7 @@ final class JsocClient: ObservableObject {
 
     init() {
         if let d = UserDefaults.standard.data(forKey: "jsoc.utente") { utente = try? JSONDecoder().decode(JUtente.self, from: d) }
+        if Anteprima.attiva { utente = Anteprima.utente }
     }
 
     /// Legge il link dell'invito: jsoctak://entra?u=<indirizzo>&c=<codice>. Restituisce (indirizzo, codice).
@@ -528,6 +529,7 @@ final class EventoStore: ObservableObject {
 
     init() {
         if let d = try? Data(contentsOf: fileEventi), let e = try? JSONDecoder().decode([JEvento].self, from: d) { eventi = e }
+        if Anteprima.attiva { eventi = Anteprima.eventi() }
         if let d = try? Data(contentsOf: fileCoda), let c = try? JSONDecoder().decode([[String: Double]].self, from: d) { coda = c; inCoda = c.count }
         if idCorrente > 0 { caricaLocale(idCorrente) }
         Livelli.shared.contesto(idCorrente > 0 ? "e\(idCorrente)" : "p")
@@ -581,7 +583,7 @@ final class EventoStore: ObservableObject {
 
     /// Scarica elenco eventi, evento attivo, squadra e messaggi nuovi. Senza rete resta tutto com'era (copia locale).
     func aggiorna(_ j: JsocClient) async {
-        guard j.collegato else { return }
+        guard j.collegato, !Anteprima.attiva else { return }
         do {
             let e = try await j.eventi()
             // si riassegna solo se cambia: ogni assegnazione fa ridisegnare tutte le schermate che osservano gli eventi

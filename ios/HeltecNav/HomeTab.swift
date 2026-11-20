@@ -24,10 +24,11 @@ final class HomeModel: ObservableObject {
 
     init() {
         if let d = try? Data(contentsOf: file) { dati = try? JSONDecoder().decode(JHome.self, from: d) }
+        if Anteprima.attiva { dati = Anteprima.home }
     }
 
     func aggiorna() async {
-        guard JsocClient.shared.collegato else { return }
+        guard JsocClient.shared.collegato, !Anteprima.attiva else { return }
         do {
             let h = try await JsocClient.shared.home()
             dati = h; errore = nil

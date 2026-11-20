@@ -70,7 +70,7 @@ private final class PuntoHome: NSObject, MKAnnotation {
     init(_ c: CLLocationCoordinate2D, _ t: String, _ col: UIColor, _ i: String) { coordinate = c; title = t; colore = col; icona = i }
 }
 
-private struct MappaStatica: UIViewRepresentable {
+struct MappaStatica: UIViewRepresentable {
     let campi: JCampi?
     let eventi: [JEvento]
 

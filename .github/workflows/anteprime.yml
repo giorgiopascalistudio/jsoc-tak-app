@@ -1,0 +1,54 @@
+name: Anteprime simulatore
+on:
+  push:
+    paths: ["ios/**", ".github/workflows/anteprime.yml"]
+  workflow_dispatch:
+jobs:
+  shots:
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+      - name: Xcode piu recente
+        run: |
+          X=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -v -i beta | sort -V | tail -1)
+          [ -n "$X" ] && sudo xcode-select -s "$X"
+          xcodebuild -version
+      - run: brew install xcodegen
+      - name: Build per simulatore
+        working-directory: ios
+        run: |
+          xcodegen generate
+          xcodebuild -project HeltecNav.xcodeproj -scheme HeltecNav -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath dd CODE_SIGNING_ALLOWED=NO build > build.log 2>&1 || {
+              grep -E "error:|Undefined|ld: " build.log | sort -u | head -80; exit 1; }
+      - name: Schermate (dati di prova, niente server)
+        working-directory: ios
+        run: |
+          APP=$(find dd/Build/Products -name "HeltecNav.app" -maxdepth 3 | head -1)
+          ID=com.giorgiopascali.heltecnav
+          mkdir -p shots
+          for MODELLO in "iPhone 1[6-7] Pro \(" "iPad Pro 11-inch"; do
+            DEV=$(xcrun simctl list devices available | grep -E "$MODELLO" | head -1 | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')
+            [ -z "$DEV" ] && continue
+            N=$(echo "$MODELLO" | tr -cd 'a-zA-Z')
+            xcrun simctl boot "$DEV"; xcrun simctl bootstatus "$DEV" -b
+            xcrun simctl status_bar "$DEV" override --time 9:41 --batteryState charged --batteryLevel 100 || true
+            xcrun simctl install "$DEV" "$APP"
+            for p in location location-always photos camera microphone; do xcrun simctl privacy "$DEV" grant $p $ID || true; done
+            xcrun simctl location "$DEV" set 40.2503,18.2789
+            shot() { n=$1; w=$2; shift 2
+              xcrun simctl terminate "$DEV" $ID || true
+              xcrun simctl launch "$DEV" $ID -anteprima.dati YES "$@"; sleep $w
+              xcrun simctl io "$DEV" screenshot "shots/$N-$n.png"; }
+            shot home 10 -debug.tab 0
+            shot eventi 6 -debug.tab 2
+            shot associazione 6 -debug.tab 3
+            shot strumenti 6 -debug.tab 5
+            xcrun simctl shutdown "$DEV" || true
+          done
+          ls shots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: anteprime
+          path: ios/shots
