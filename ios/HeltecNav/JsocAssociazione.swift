@@ -161,7 +161,7 @@ struct JHome: Codable {
         let id: Int; let nome: String; let tipo: String; let inizio: String?; let fine: String?; let luogo: String?
         let mio_ruolo: String?; let mia_risposta: String?; let si: Int
     }
-    struct Avviso: Codable, Hashable { let tipo: String; let testo: String; let evento: Int? }
+    struct Avviso: Codable, Hashable { let tipo: String; let testo: String; let evento: Int?; var destra: String? = nil }
     struct Direttivo: Codable { let quote_da_incassare: Int?; let saldo: Double?; let certificati_scaduti: Int?; var proposte: Int? = nil }
     let prossimi: [Prossimo]
     let avvisi: [Avviso]

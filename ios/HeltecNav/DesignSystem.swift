@@ -5,22 +5,33 @@ import SwiftUI
 // Nero OLED con un filo di verde, accento verde oliva (stile patch ricamata), testo bianco.
 // I numeri e le coordinate sempre in monospaziato; titoli di sezione in maiuscoletto spaziato.
 
+extension Color {
+    init(hex: UInt32, alpha: Double = 1) {
+        self.init(.sRGB, red: Double((hex >> 16) & 0xFF) / 255, green: Double((hex >> 8) & 0xFF) / 255, blue: Double(hex & 0xFF) / 255, opacity: alpha)
+    }
+}
+
 enum Theme {
     /// Accento principale (il nome resta "gold" per compatibilità col codice esistente): verde oliva.
     static let gold = Color(red: 0.604, green: 0.682, blue: 0.357)            // #9AAE5B
     static let olive = gold
-    static let oliveBright = Color(red: 0.74, green: 0.82, blue: 0.48)
+    static let oliveBright = Color(hex: 0xB9CF6E)
     static let oliveDeep = Color(red: 0.20, green: 0.24, blue: 0.11)
-    static let red = Color(red: 0.95, green: 0.36, blue: 0.30)
-    static let amber = Color(red: 0.92, green: 0.64, blue: 0.28)
-    static let cyan = Color(red: 0.45, green: 0.78, blue: 0.86)
-    static let green = Color(red: 0.45, green: 0.85, blue: 0.45)
-    static let bg = Color(red: 0.020, green: 0.024, blue: 0.016)
-    static let surface = Color(red: 0.060, green: 0.068, blue: 0.050)
-    static let surface2 = Color(red: 0.090, green: 0.102, blue: 0.075)
+    static let red = Color(hex: 0xF25C4D)
+    static let amber = Color(hex: 0xE8B24A)
+    static let cyan = Color(hex: 0x73C7DB)
+    static let green = Color(hex: 0x5FD36B)
+    // colori della tela (bozze approvate)
+    static let bg = Color(hex: 0x0B0E09)
+    static let surface = Color(hex: 0x151A10)
+    static let surface2 = Color(hex: 0x1A2013)
+    static let barra = Color(hex: 0x10140C)
+    static let testo = Color(hex: 0xF2F2EE)
+    static let testo2 = Color(hex: 0xC9CDBB)
+    static let scuro = Color(hex: 0x10140C)
     static let stroke = Color(red: 0.604, green: 0.682, blue: 0.357).opacity(0.22)
     static let card = surface
-    static let dim = Color.white.opacity(0.58)
+    static let dim = Color(hex: 0xA7AD98)
 
     static func mono(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
         .system(size: size, weight: weight, design: .monospaced)

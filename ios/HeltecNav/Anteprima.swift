@@ -35,8 +35,8 @@ enum Anteprima {
 
     static let home = JHome(
         prossimi: [],
-        avvisi: [JHome.Avviso(tipo: "promemoria", testo: "Quota sociale 2027 · 40 €", evento: nil),
-                 JHome.Avviso(tipo: "avviso", testo: "Certificato medico in scadenza", evento: nil)],
+        avvisi: [JHome.Avviso(tipo: "promemoria", testo: "Quota sociale 2027 · 40 €", evento: nil, destra: "entro 31 dic"),
+                 JHome.Avviso(tipo: "avviso", testo: "Certificato medico", evento: nil, destra: "scade tra 18 g")],
         post_nuovi: 1, sondaggi_aperti: 1, soci_attivi: 18,
         direttivo: JHome.Direttivo(quote_da_incassare: 3, saldo: 412.30, certificati_scaduti: 1, proposte: 0))
 }

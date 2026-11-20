@@ -7,12 +7,13 @@ import PhotosUI
 struct BarraSchede: View {
     @Binding var tab: Int
     let verticale: Bool
-    var badge: [Int: Int] = [:]
+    var badge: [Int: Int] = [:]          // la tela non mostra numeri sulla barra: non usato
     @Namespace private var spazio
 
-    static let voci: [(Int, String, String)] = [(Schede.home, "Home", "house.fill"), (Schede.eventi, "Eventi", "calendar"),
-                                               (Schede.associazione, "Associazione", "shield.lefthalf.filled"),
-                                               (Schede.strumenti, "Strumenti", "square.grid.2x2.fill")]
+    // icone a tratto, come le tavole
+    static let voci: [(Int, String, String)] = [(Schede.home, "Home", "house"), (Schede.eventi, "Eventi", "calendar"),
+                                               (Schede.associazione, "Associazione", "shield"),
+                                               (Schede.strumenti, "Strumenti", "square.grid.2x2")]
 
     var body: some View {
         let _ = Contatori.disegno("BarraSchede")
@@ -22,33 +23,72 @@ struct BarraSchede: View {
                 let on = tab == v.0
                 Button { if tab != v.0 { haptic(.soft); Prestazioni.shared.cambio(verso: v.0) }; tab = v.0 } label: {
                     VStack(spacing: 3) {
-                        Image(systemName: v.2).font(.system(size: 18, weight: .semibold))
+                        Image(systemName: v.2).font(.system(size: 19, weight: .medium))
                             .foregroundStyle(on ? Theme.oliveBright : Theme.dim)
-                            .overlay(alignment: .topTrailing) {
-                                if let n = badge[v.0], n > 0 {
-                                    Text("\(n)").font(.system(size: 9, weight: .heavy)).foregroundStyle(.white)
-                                        .padding(.horizontal, 4).frame(minWidth: 15, minHeight: 15)
-                                        .background(Theme.red, in: Capsule()).offset(x: 10, y: -6)
-                                }
-                            }
-                        Text(v.1).font(.system(size: 10, weight: .bold)).foregroundStyle(on ? .white : Theme.dim)
+                        Text(v.1).font(.system(size: 10, weight: .bold)).foregroundStyle(on ? Theme.testo : Theme.dim)
                             .lineLimit(1).minimumScaleFactor(0.7)
                     }
-                    .frame(maxWidth: verticale ? 64 : .infinity).frame(height: verticale ? 56 : 50)
+                    .frame(maxWidth: verticale ? 64 : .infinity).frame(height: verticale ? 56 : 52)
                     .background {
-                        // la pastiglia scorre da una voce all'altra
-                        if on { RoundedRectangle(cornerRadius: 18).fill(Theme.olive.opacity(0.18)).matchedGeometryEffect(id: "sel", in: spazio) }
+                        if on { RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Theme.olive.opacity(0.18)).matchedGeometryEffect(id: "sel", in: spazio) }
                     }
-                    .scaleEffect(on ? 1 : 0.96)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(PressStyle())
             }
         }
         .animation(ConfigApp.schede ? .spring(response: 0.32, dampingFraction: 0.8) : nil, value: tab)
-        .padding(4)
-        .background(Theme.surface.opacity(0.96), in: RoundedRectangle(cornerRadius: 24))
-        .overlay(RoundedRectangle(cornerRadius: 24).strokeBorder(Theme.stroke))
-        .shadow(color: .black.opacity(0.5), radius: 12, y: 4)
+        .padding(.horizontal, 4).padding(.vertical, verticale ? 4 : 0)
+        .frame(height: verticale ? nil : 60)
+        .background(Color(hex: 0x151A10).opacity(0.94), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous).strokeBorder(Theme.stroke))
+        .shadow(color: .black.opacity(0.5), radius: 12, y: 8)
+    }
+}
+
+/// iPad (tavole 67-72): colonna fissa a sinistra larga 92, profilo in alto, campanella in basso
+struct ColonnaIPad: View {
+    @Binding var tab: Int
+    var notifiche: Int
+
+    static let voci: [(Int, String, String)] = [(Schede.home, "Home", "house"), (Schede.eventi, "Eventi", "calendar"), (Schede.mappa, "Mappa", "map"),
+                                               (Schede.associazione, "Associaz.", "shield"), (Schede.strumenti, "Strumenti", "square.grid.2x2")]
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Button { vaiAllaScheda(Schede.home); NotificationCenter.default.post(name: .apriProfilo, object: nil) } label: {
+                Avatar(lato: 46, bordo: 2, testo: 15)
+            }
+            .accessibilityLabel("Profilo")
+            .padding(.bottom, 14)
+            ForEach(Self.voci, id: \.0) { v in
+                let on = tab == v.0
+                Button {
+                    haptic(.soft)
+                    if v.0 == Schede.mappa && tab != Schede.mappa { SchedaPrecedente.valore = tab }
+                    tab = v.0
+                } label: {
+                    VStack(spacing: 5) {
+                        Image(systemName: v.2).font(.system(size: 21, weight: .medium)).foregroundStyle(on ? Theme.oliveBright : Theme.dim)
+                        Text(v.1).font(.system(size: 11, weight: .bold)).foregroundStyle(on ? Theme.testo : Theme.dim)
+                    }
+                    .frame(width: 76, height: 66)
+                    .background(on ? Theme.olive.opacity(0.18) : .clear, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(PressStyle())
+            }
+            Spacer()
+            TastoCampanella(numero: notifiche, lato: 52) {
+                vaiAllaScheda(Schede.home)
+                NotificationCenter.default.post(name: .apriNotifiche, object: nil)
+            }
+        }
+        .padding(.top, 26).padding(.bottom, 18)
+        .frame(width: 92)
+        .frame(maxHeight: .infinity)
+        .background(Theme.barra.ignoresSafeArea())
+        .overlay(alignment: .trailing) { Rectangle().fill(Theme.olive.opacity(0.16)).frame(width: 1).ignoresSafeArea() }
     }
 }
 
@@ -57,11 +97,10 @@ struct ContenitoreSchede: View {
     @Binding var tab: Int
     @ObservedObject private var evento = EventoStore.shared
     @ObservedObject private var home = HomeModel.shared
+    @Environment(\.horizontalSizeClass) private var classe
 
-    var badge: [Int: Int] {
-        [Schede.home: (home.dati?.avvisi ?? []).filter { $0.tipo != "evento" }.count,
-         Schede.eventi: evento.nonLetti + evento.eventi.filter { $0.fase != 2 && $0.stato != "proposto" && $0.mia_risposta == nil }.count,
-         Schede.associazione: (home.dati?.post_nuovi ?? 0) + (home.dati?.sondaggi_aperti ?? 0)]
+    var notifiche: Int {
+        (home.dati?.avvisi ?? []).count + evento.eventi.filter { $0.fase != 2 && $0.stato != "proposto" && !$0.annullato && $0.mia_risposta == nil }.count
     }
 
     /// entrata della scheda: dissolvenza e piccolo scorrimento solo sulla scheda che compare (costa poco)
@@ -90,16 +129,18 @@ struct ContenitoreSchede: View {
         let _ = Contatori.disegno("ContenitoreSchede")
         GeometryReader { g in
             let land = g.size.width > g.size.height
+            let ipad = classe == .regular
             ZStack {
                 HStack(spacing: 0) {
-                    if land {
-                        // in orizzontale la barra diventa una colonna stretta a sinistra
-                        BarraSchede(tab: $tab, verticale: true, badge: badge)
+                    if ipad {
+                        ColonnaIPad(tab: $tab, notifiche: notifiche)
+                    } else if land {
+                        // telefono in orizzontale: la barra diventa una colonna stretta a sinistra
+                        BarraSchede(tab: $tab, verticale: true)
                             .padding(.leading, 6).padding(.vertical, 8)
                             .frame(maxHeight: .infinity)
                     }
                     // TabView nativo (senza la sua barra): disegna solo la scheda visibile e tiene lo stato delle altre.
-                    // Prima tutte le schede restavano disegnate una sopra l'altra, trasparenti: era la causa degli scatti.
                     TabView(selection: selezione) {
                         ForEach([Schede.home, Schede.eventi, Schede.associazione, Schede.strumenti, Schede.profilo], id: \.self) { t in
                             vista(t)
@@ -109,8 +150,9 @@ struct ContenitoreSchede: View {
                         }
                     }
                     .safeAreaInset(edge: .bottom, spacing: 0) {
-                        if !land {
-                            BarraSchede(tab: $tab, verticale: false, badge: badge).padding(.horizontal, 14).padding(.bottom, 2)
+                        if !land && !ipad {
+                            // tavola: lati 14, 22 dal fondo dello schermo (scende di 12 nella zona della barretta)
+                            BarraSchede(tab: $tab, verticale: false).padding(.horizontal, 14).padding(.bottom, -12)
                         }
                     }
                 }

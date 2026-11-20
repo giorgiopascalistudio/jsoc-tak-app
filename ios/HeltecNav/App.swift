@@ -85,7 +85,7 @@ struct JsocTakApp: App {
                 C.osserva("Registro", log.objectWillChange); C.osserva("Rilevamenti", rilevamenti.objectWillChange)
                 Task { await jsoc.aggiornaIndirizzo() }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 15) { Diagnostica.avvioRiuscito() }
-                Avvisi.shared.attiva()
+                if !Anteprima.attiva { Avvisi.shared.attiva() }
                 location.start()
                 if UserDefaults.standard.bool(forKey: "debug.landscape"),
                    let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {

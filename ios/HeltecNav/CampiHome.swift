@@ -73,6 +73,7 @@ private final class PuntoHome: NSObject, MKAnnotation {
 struct MappaStatica: UIViewRepresentable {
     let campi: JCampi?
     let eventi: [JEvento]
+    var scura = false
 
     func makeUIView(context: Context) -> MKMapView {
         let m = MKMapView()
@@ -81,7 +82,7 @@ struct MappaStatica: UIViewRepresentable {
         m.showsUserLocation = false
         m.overrideUserInterfaceStyle = .dark
         m.pointOfInterestFilter = .excludingAll
-        m.mapType = .hybrid
+        if scura { m.preferredConfiguration = MKStandardMapConfiguration(emphasisStyle: .muted) } else { m.mapType = .hybrid }
         return m
     }
 

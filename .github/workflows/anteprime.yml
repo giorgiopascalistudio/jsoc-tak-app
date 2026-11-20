@@ -40,10 +40,11 @@ jobs:
               xcrun simctl terminate "$DEV" $ID || true
               xcrun simctl launch "$DEV" $ID -anteprima.dati YES "$@"; sleep $w
               xcrun simctl io "$DEV" screenshot "shots/$N-$n.png"; }
-            shot home 10 -debug.tab 0
-            shot eventi 6 -debug.tab 2
-            shot associazione 6 -debug.tab 3
-            shot strumenti 6 -debug.tab 5
+            if [ "$N" = "iPadProinch" ]; then L="-debug.landscape YES"; else L=""; fi
+            shot home 12 -debug.tab 0 $L
+            shot eventi 6 -debug.tab 2 $L
+            shot associazione 6 -debug.tab 3 $L
+            shot strumenti 6 -debug.tab 5 $L
             xcrun simctl shutdown "$DEV" || true
           done
           ls shots
