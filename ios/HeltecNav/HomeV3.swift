@@ -103,7 +103,7 @@ struct HomeV3: View {
             }
             .padding(.horizontal, 14)
             .padding(.top, 8)
-            .padding(.bottom, 14)
+            .padding(.bottom, 26)      // 14 sopra la barra (che scende di 12)
         }
     }
 
@@ -121,9 +121,9 @@ struct HomeV3: View {
                         Text("Ciao, \(jsoc.utente?.callsign ?? "")").font(.system(size: 30, weight: .black)).tracking(-0.6).foregroundStyle(Theme.testo)
                     }
                     SchedaProssimo(evento: prossimoEvento, grande: true, apri: apriProssimo)
-                    daFareIPad
-                    if !largo {
-                        HStack(spacing: 14) { calendarioIPad; MappaHomeMini(eventi: eventiFuturi, grande: true) }.frame(height: 330)
+                    if largo { daFareIPad } else {
+                        daFareIPad.fixedSize(horizontal: false, vertical: true)
+                        HStack(alignment: .top, spacing: 14) { calendarioIPad; MappaHomeMini(eventi: eventiFuturi, grande: true) }.frame(maxHeight: .infinity)
                     }
                 }
                 if largo {
@@ -164,7 +164,7 @@ struct HomeV3: View {
         for (i, a) in (d?.avvisi ?? []).filter({ $0.tipo != "evento" }).enumerated() {
             let t = a.testo.lowercased()
             let (ic, col, dx): (String, Color, String) =
-                t.contains("certificat") ? ("heart", Theme.red, "scade") :
+                t.contains("certificat") ? (classe == .regular ? "heart" : "cross.case", Theme.red, "scade") :
                 t.contains("quota") ? ("creditcard", Theme.amber, "da pagare") :
                 a.tipo == "promemoria" ? ("bell.badge", Theme.amber, "promemoria") : ("paperplane", Theme.amber, "Ho letto")
             v.append(VoceDaFare(id: "av\(i)", icona: ic, colore: col, testo: a.testo, destra: a.destra ?? dx) {

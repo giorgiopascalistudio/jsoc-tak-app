@@ -114,10 +114,12 @@ struct MappaStatica: UIViewRepresentable {
         m.setRegion(r, animated: false)
     }
 
-    func makeCoordinator() -> Coord { Coord() }
+    func makeCoordinator() -> Coord { Coord(scura: scura) }
 
     final class Coord: NSObject, MKMapViewDelegate {
         var firma = ""
+        let scura: Bool
+        init(scura: Bool) { self.scura = scura }
         func mapView(_ m: MKMapView, rendererFor o: MKOverlay) -> MKOverlayRenderer {
             guard let p = o as? MKPolygon else { return MKOverlayRenderer(overlay: o) }
             let r = MKPolygonRenderer(polygon: p)
@@ -127,6 +129,18 @@ struct MappaStatica: UIViewRepresentable {
         }
         func mapView(_ m: MKMapView, viewFor a: MKAnnotation) -> MKAnnotationView? {
             guard let p = a as? PuntoHome else { return nil }
+            if scura {
+                // tavola: puntini piccoli, niente etichette
+                let v = MKAnnotationView(annotation: p, reuseIdentifier: nil)
+                v.image = UIGraphicsImageRenderer(size: CGSize(width: 16, height: 16)).image { _ in
+                    let r = CGRect(x: 1.5, y: 1.5, width: 13, height: 13)
+                    p.colore.setFill(); UIBezierPath(ovalIn: r).fill()
+                    UIColor(red: 0.04, green: 0.05, blue: 0.035, alpha: 1).setStroke()
+                    let b = UIBezierPath(ovalIn: r); b.lineWidth = 2; b.stroke()
+                }
+                v.canShowCallout = false
+                return v
+            }
             let v = MKMarkerAnnotationView(annotation: p, reuseIdentifier: nil)
             v.markerTintColor = p.colore
             v.glyphImage = UIImage(systemName: p.icona)

@@ -41,6 +41,13 @@ jobs:
               xcrun simctl launch "$DEV" $ID -anteprima.dati YES "$@"; sleep $w
               xcrun simctl io "$DEV" screenshot "shots/$N-$n.png"; }
             if [ "$N" = "iPadProinch" ]; then L="-debug.landscape YES"; else L=""; fi
+            if [ "$N" = "iPadProinch" ]; then
+              # ruota l'iPad in orizzontale (tavola 67): menu Device > Rotate Right del Simulatore
+              open -a Simulator --args -CurrentDeviceUDID "$DEV" || true
+              sleep 8
+              osascript -e 'tell application "Simulator" to activate' -e 'delay 1'                 -e 'tell application "System Events" to tell process "Simulator" to click menu item "Rotate Right" of menu "Device" of menu bar 1' || echo "rotazione non riuscita"
+              sleep 3
+            fi
             shot home 12 -debug.tab 0 $L
             shot eventi 6 -debug.tab 2 $L
             shot associazione 6 -debug.tab 3 $L
