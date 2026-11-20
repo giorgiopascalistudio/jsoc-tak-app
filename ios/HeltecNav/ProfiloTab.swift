@@ -98,6 +98,7 @@ struct ProfiloTab: View {
             Section {
                 Button { collega = true } label: { Label("Collega un altro dispositivo (iPad)", systemImage: "ipad.and.iphone") }
             } footer: { Text("Mostra un QR: lo inquadri dall'altro dispositivo ed entri con lo stesso profilo.") }
+            OrologioGarminSezione()
             Section {
                 Button("Esci da questo telefono", role: .destructive) { esci = true }
             }

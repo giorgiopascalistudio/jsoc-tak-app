@@ -12,6 +12,9 @@ packages:
   HaishinKit:
     url: https://github.com/HaishinKit/HaishinKit.swift
     exactVersion: 2.3.0
+  ConnectIQ:
+    url: https://github.com/garmin/connectiq-companion-app-sdk-ios
+    branch: main
 targets:
   HeltecNav:
     type: application
@@ -27,6 +30,8 @@ targets:
         product: SRTHaishinKit
       - package: HaishinKit
         product: RTMPHaishinKit
+      - package: ConnectIQ
+        product: ConnectIQ
     sources:
       - path: HeltecNav
       - path: Shared
@@ -44,7 +49,8 @@ targets:
           UIApplicationSupportsMultipleScenes: false
         CFBundleURLTypes:
           - CFBundleURLName: com.giorgiopascali.jsoctak
-            CFBundleURLSchemes: [jsoctak]
+            CFBundleURLSchemes: [jsoctak, jsoctak-ciq]
+        LSApplicationQueriesSchemes: [gcm-ciq]
         NSSupportsLiveActivities: true
         NSSupportsLiveActivitiesFrequentUpdates: true
         UIRequiredDeviceCapabilities: [arm64]

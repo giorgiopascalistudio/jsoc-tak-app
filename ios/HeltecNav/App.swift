@@ -165,8 +165,10 @@ struct JsocTakApp: App {
                 docs.cambiaEvento()
                 Task { await docs.sync(jsoc, force: true) }
             }
+            .task { GarminPonte.shared.avvia() }
             .onOpenURL { url in
                 Diagnostica.passo("apre link \(url.scheme ?? "")")
+                if GarminPonte.shared.apri(url) { return }
                 if url.scheme == "jsoctak" {
                     UserDefaults.standard.set(url.absoluteString, forKey: "jsoc.invito")
                     tab = 0
