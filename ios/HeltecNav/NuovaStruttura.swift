@@ -11,9 +11,9 @@ struct BarraSchede: View {
     @Namespace private var spazio
 
     // icone a tratto, come le tavole
-    static let voci: [(Int, String, String)] = [(Schede.home, "Home", "house"), (Schede.eventi, "Eventi", "calendar"),
-                                               (Schede.associazione, "Associazione", "shield"),
-                                               (Schede.strumenti, "Strumenti", "square.grid.2x2")]
+    static let voci: [(Int, String, String)] = [(Schede.home, "Home", Ic.casa), (Schede.eventi, "Eventi", Ic.calendario),
+                                               (Schede.associazione, "Associazione", Ic.scudo),
+                                               (Schede.strumenti, "Strumenti", Ic.griglia)]
 
     var body: some View {
         let _ = Contatori.disegno("BarraSchede")
@@ -23,7 +23,7 @@ struct BarraSchede: View {
                 let on = tab == v.0
                 Button { if tab != v.0 { haptic(.soft); Prestazioni.shared.cambio(verso: v.0) }; tab = v.0 } label: {
                     VStack(spacing: 3) {
-                        Image(systemName: v.2).font(.system(size: 19, weight: .medium))
+                        IconaTela(d: v.2, colore: on ? Theme.oliveBright : Theme.dim, lato: 20)
                             .foregroundStyle(on ? Theme.oliveBright : Theme.dim)
                         Text(v.1).font(.system(size: 10, weight: .bold)).foregroundStyle(on ? Theme.testo : Theme.dim)
                             .lineLimit(1).minimumScaleFactor(0.7)
@@ -51,8 +51,8 @@ struct ColonnaIPad: View {
     @Binding var tab: Int
     var notifiche: Int
 
-    static let voci: [(Int, String, String)] = [(Schede.home, "Home", "house"), (Schede.eventi, "Eventi", "calendar"), (Schede.mappa, "Mappa", "map"),
-                                               (Schede.associazione, "Associaz.", "shield"), (Schede.strumenti, "Strumenti", "square.grid.2x2")]
+    static let voci: [(Int, String, String)] = [(Schede.home, "Home", Ic.casa), (Schede.eventi, "Eventi", Ic.calendario), (Schede.mappa, "Mappa", Ic.mappa),
+                                               (Schede.associazione, "Associaz.", Ic.scudo), (Schede.strumenti, "Strumenti", Ic.griglia)]
 
     var body: some View {
         VStack(spacing: 6) {
@@ -69,7 +69,7 @@ struct ColonnaIPad: View {
                     tab = v.0
                 } label: {
                     VStack(spacing: 5) {
-                        Image(systemName: v.2).font(.system(size: 21, weight: .medium)).foregroundStyle(on ? Theme.oliveBright : Theme.dim)
+                        IconaTela(d: v.2, colore: on ? Theme.oliveBright : Theme.dim, lato: 22)
                         Text(v.1).font(.system(size: 11, weight: .bold)).foregroundStyle(on ? Theme.testo : Theme.dim)
                     }
                     .frame(width: 76, height: 66)

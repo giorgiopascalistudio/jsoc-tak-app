@@ -31,6 +31,8 @@ enum Ic {
     static let persona = "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z M4 21c1-4 4-6 8-6s7 2 8 6"
     static let cuore = "M12 20s-8-5-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 9c0 6-8 11-8 11Z"
     static let carta = "M3 6h18v13H3Z M3 10h18 M7 15h4"
+    static let cartaTonda = "M5 6h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z M3 10h18 M7 15h4"
+    static let cartellina = "M9 3h6v4H9Z M5 5h14v16H5Z M12 11v6 M9 14h6"
     static let scatola = "M3 7l9-4 9 4v10l-9 4-9-4Z M3 7l9 4 9-4 M12 11v10"
     static let ingranaggio = "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M19 12l2-1-1-3-2 .3-1.4-1.4L17 5l-3-1-1 2h-2l-1-2-3 1 .4 2L6 8.3 4 8l-1 3 2 1v0l-2 1 1 3 2-.3 1.4 1.4L7 19l3 1 1-2h2l1 2 3-1-.4-2 1.4-1.4 2 .3 1-3Z"
     static let dispositivi = "M4 4h11v16H4Z M17 8h3v12h-3 M9 17h1"

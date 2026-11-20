@@ -159,23 +159,28 @@ struct HomeV3: View {
         var v: [VoceDaFare] = []
         let d = home.dati
         if let p = d?.direttivo?.proposte, p > 0 {
-            v.append(VoceDaFare(id: "proposte", icona: "checkmark.seal", colore: Theme.amber, testo: p == 1 ? "1 evento da approvare" : "\(p) eventi da approvare", destra: "approva") { vaiAllaScheda(Schede.eventi) })
+            v.append(VoceDaFare(id: "proposte", icona: Ic.spunta, colore: Theme.amber, testo: p == 1 ? "1 evento da approvare" : "\(p) eventi da approvare", destra: "approva") { vaiAllaScheda(Schede.eventi) })
         }
-        for (i, a) in (d?.avvisi ?? []).filter({ $0.tipo != "evento" }).enumerated() {
+        // icone come le tavole: quota = carta, certificato = cartellina (telefono) o cuore (iPad), sondaggio = barre, avviso = aereo di carta
+        let avvisi = (d?.avvisi ?? []).filter { $0.tipo != "evento" }
+        for (i, a) in avvisi.enumerated() {
             let t = a.testo.lowercased()
             let (ic, col, dx): (String, Color, String) =
-                t.contains("certificat") ? (classe == .regular ? "heart" : "cross.case", Theme.red, "scade") :
-                t.contains("quota") ? ("creditcard", Theme.amber, "da pagare") :
-                a.tipo == "promemoria" ? ("bell.badge", Theme.amber, "promemoria") : ("paperplane", Theme.amber, "Ho letto")
+                a.tipo == "certificato" || t.contains("certificat") ? (classe == .regular ? Ic.cuore : Ic.cartellina, Theme.red, "scade") :
+                a.tipo == "quota" || t.contains("quota") ? (Ic.cartaTonda, Theme.amber, "da pagare") :
+                a.tipo == "tessera" ? (Ic.carta, Theme.amber, "scade") :
+                a.tipo == "sondaggio" ? (Ic.sondaggio, Theme.cyan, "vota") :
+                a.tipo == "promemoria" ? (Ic.calendario, Theme.amber, "rispondi") : (Ic.invia, Theme.amber, "Ho letto")
             v.append(VoceDaFare(id: "av\(i)", icona: ic, colore: col, testo: a.testo, destra: a.destra ?? dx) {
                 if let id = a.evento, let e = store.eventi.first(where: { $0.id == id }) { percorso.append(e) } else { vaiAllaScheda(Schede.associazione) }
             })
         }
-        if let s = d?.sondaggi_aperti, s > 0 {
-            v.append(VoceDaFare(id: "sondaggi", icona: "chart.bar.xaxis", colore: Theme.cyan, testo: s == 1 ? "Sondaggio aperto" : "\(s) sondaggi aperti", destra: "vota") { vaiAllaScheda(Schede.associazione) })
+        // server vecchio (prima della 0.19): solo il numero dei sondaggi
+        if let s = d?.sondaggi_aperti, s > 0, !avvisi.contains(where: { $0.tipo == "sondaggio" }) {
+            v.append(VoceDaFare(id: "sondaggi", icona: Ic.sondaggio, colore: Theme.cyan, testo: s == 1 ? "Sondaggio aperto" : "\(s) sondaggi aperti", destra: "vota") { vaiAllaScheda(Schede.associazione) })
         }
-        for e in senzaRisposta where e.id != prossimoEvento?.id {
-            v.append(VoceDaFare(id: "ev\(e.id)", icona: "questionmark.circle", colore: Theme.amber, testo: e.nome, destra: "rispondi") { percorso.append(e) })
+        for e in senzaRisposta where e.id != prossimoEvento?.id && !avvisi.contains(where: { $0.evento == e.id }) {
+            v.append(VoceDaFare(id: "ev\(e.id)", icona: Ic.calendario, colore: Theme.amber, testo: e.nome, destra: "rispondi") { percorso.append(e) })
         }
         return v
     }
@@ -192,7 +197,7 @@ struct HomeV3: View {
                 }
             }
             .padding(.horizontal, 2)
-            if voci.isEmpty { RigaDaFare(voce: VoceDaFare(id: "ok", icona: "checkmark.circle", colore: Theme.green, testo: "Tutto in ordine", destra: "") {}) }
+            if voci.isEmpty { RigaDaFare(voce: VoceDaFare(id: "ok", icona: Ic.spunta, colore: Theme.green, testo: "Tutto in ordine", destra: "") {}) }
             ForEach(voci.prefix(3)) { RigaDaFare(voce: $0) }
         }
     }
@@ -207,7 +212,7 @@ struct HomeV3: View {
                 Button("tutto ›") { tuttiDaFare = true }.font(.system(size: 12, weight: .heavy)).foregroundStyle(Theme.oliveBright)
             }
             .padding(.bottom, 2)
-            if voci.isEmpty { RigaDaFare(voce: VoceDaFare(id: "ok", icona: "checkmark.circle", colore: Theme.green, testo: "Tutto in ordine", destra: "") {}, grande: true) }
+            if voci.isEmpty { RigaDaFare(voce: VoceDaFare(id: "ok", icona: Ic.spunta, colore: Theme.green, testo: "Tutto in ordine", destra: "") {}, grande: true) }
             ForEach(voci.prefix(6)) { RigaDaFare(voce: $0, grande: true) }
             Spacer(minLength: 0)
         }
@@ -243,7 +248,7 @@ struct TastoCampanella: View {
     let azione: () -> Void
     var body: some View {
         Button(action: azione) {
-            Image(systemName: "bell").font(.system(size: lato * 0.43, weight: .medium)).foregroundStyle(Theme.testo)
+            IconaTela(d: Ic.campanella, colore: Theme.testo, lato: lato * 0.45)
                 .frame(width: lato, height: lato)
                 .background(Theme.surface, in: Circle())
                 .overlay(Circle().strokeBorder(Theme.stroke))
@@ -351,7 +356,7 @@ struct SchedaProssimo: View {
                 .padding(.trailing, grande ? 18 : 14).padding(.top, grande ? 12 : 10)
             if let m = meteo {
                 HStack(spacing: 6) {
-                    Image(systemName: "sun.max").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.amber)
+                    IconaTela(d: Ic.sole, colore: Theme.amber, lato: 15)
                     Text(m)
                 }
                 .font(.system(size: grande ? 13 : 11.5, weight: .bold)).foregroundStyle(Color(hex: 0xE4E7DA))
@@ -446,7 +451,7 @@ struct RigaDaFare: View {
         let rosso = voce.colore == Theme.red
         Button { haptic(); voce.azione() } label: {
             HStack(spacing: grande ? 12 : 10) {
-                Image(systemName: voce.icona).font(.system(size: grande ? 17 : 15, weight: .medium)).foregroundStyle(voce.colore).frame(width: grande ? 20 : 18)
+                IconaTela(d: voce.icona, colore: voce.colore, lato: grande ? 20 : 18)
                 Text(voce.testo).font(.system(size: grande ? 14.5 : 13, weight: .bold)).foregroundStyle(Theme.testo).lineLimit(1)
                 Spacer(minLength: 6)
                 Text(voce.destra).font(.system(size: grande ? 12 : 10.5, weight: .heavy)).foregroundStyle(voce.colore)
