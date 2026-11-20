@@ -558,7 +558,7 @@ struct CentroNotifiche: View {
             .navigationTitle("Notifiche").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Segna tutte lette") { letteTesto = lette.union(voci.map(.id)).joined(separator: "|") }.disabled(voci.isEmpty)
+                    Button("Segna tutte lette") { letteTesto = lette.union(voci.map { $0.id }).joined(separator: "|") }.disabled(voci.isEmpty)
                 }
                 ToolbarItem(placement: .confirmationAction) { Button("Chiudi") { chiudi() } }
             }
