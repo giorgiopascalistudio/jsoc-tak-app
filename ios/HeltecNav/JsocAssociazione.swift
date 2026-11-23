@@ -36,6 +36,10 @@ struct JProfilo: Codable, Hashable, Identifiable {
     var allergie: String?
     var farmaci: String?
     var emergenza_visibile: String?
+    // vista del socio (tavola SchedaSocioSocio10): opzionali, il server può non mandarli
+    var carica: String?
+    var ammesso: String?
+    var specialita: String?
 
     var direttivo: Bool { ruolo == "direttivo" }
     /// giorni alla scadenza del certificato (negativo = scaduto, nil = non inserito)
