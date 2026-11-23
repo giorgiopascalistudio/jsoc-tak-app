@@ -43,7 +43,7 @@ enum Anteprima {
     static var profilo: JProfilo {
         var p = JProfilo(id: 1, nome: "Giorgio Pascali", callsign: "GREG", ruolo: "direttivo")
         p.email = "giorgio@esempio.it"; p.telefono = "+39 333 1234567"; p.nascita = "1990-03-12"; p.luogo_nascita = "Lecce"
-        p.cf = "PSCGRG90C12E506X"; p.gruppo_sanguigno = "0+"; p.emergenza = "Maria R.|madre|+39 333 765 4321"
+        p.cf = "PSCGRG90C12E506G"; p.gruppo_sanguigno = "0+"; p.emergenza = "Maria R.|madre|+39 333 765 4321"
         // tavole 33-36
         p.cognome = "Pascali"; p.sesso = "M"; p.provincia_nascita = "LE"; p.telefono = "+39 333 123 4567"
         p.indirizzo = "via Roma 12"; p.cap = "73100"; p.citta = "Lecce"; p.provincia = "LE"

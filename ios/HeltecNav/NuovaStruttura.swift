@@ -97,6 +97,7 @@ struct ContenitoreSchede: View {
     @Binding var tab: Int
     @ObservedObject private var evento = EventoStore.shared
     @ObservedObject private var home = HomeModel.shared
+    @ObservedObject private var moduli = ModuliAperti.shared
     @Environment(\.horizontalSizeClass) private var classe
 
     var notifiche: Int {
@@ -150,7 +151,7 @@ struct ContenitoreSchede: View {
                         }
                     }
                     .safeAreaInset(edge: .bottom, spacing: 0) {
-                        if !land && !ipad {
+                        if !land && !ipad && moduli.aperti == 0 {
                             // tavola: lati 14, 22 dal fondo dello schermo (scende di 12 nella zona della barretta)
                             BarraSchede(tab: $tab, verticale: false).padding(.horizontal, 14).padding(.bottom, -12)
                         }

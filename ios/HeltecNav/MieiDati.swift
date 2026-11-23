@@ -272,6 +272,8 @@ struct MieiDatiView: View {
         }
         .background(Theme.bg.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
+        .onAppear { ModuliAperti.shared.aperti += 1 }   // tavole 33-36: senza la barra in basso
+        .onDisappear { ModuliAperti.shared.aperti = max(0, ModuliAperti.shared.aperti - 1) }
         .task { await carica() }
         .sheet(isPresented: $fotocamera) { CameraPicker { img in carica(img.ridotta(lato: 1800).jpegData(compressionQuality: 0.8), "image/jpeg") }.ignoresSafeArea() }
         .fileImporter(isPresented: $importaFile, allowedContentTypes: [.pdf, .image]) { r in
@@ -395,12 +397,16 @@ struct MieiDatiView: View {
                         indirizzi.dettagli(r) { c, ci, p in cap = c; citta = ci; provincia = p }
                         indirizzi.risultati = []
                     }
+                } else if Anteprima.attiva && UserDefaults.standard.string(forKey: "debug.modulo") == "dati" {
+                    // solo anteprime: le proposte di Apple Mappe non si possono fingere, mostro quelle della tavola 34
+                    ElencoProposte(righe: [("Via Roma 12", "73100 Lecce LE"), ("Via Roma 12", "73010 Surbo LE"), ("Viale Roma 12", "73020 Cavallino LE")], icona: Ic.segnaposto) { _ in }
                 }
             }
             HStack(spacing: 8) {
-                CampoTesto(etichetta: "CAP", testo: $cap, mono: true, auto: true).frame(maxWidth: .infinity).layoutPriority(0.9)
-                CampoTesto(etichetta: "Città", testo: $citta, auto: true).layoutPriority(1.5)
-                CampoTesto(etichetta: "Prov.", testo: $provincia, maiuscole: .characters, auto: true).frame(width: 64)
+                // tavola 34: CAP 100, città il resto, provincia 78
+                CampoTesto(etichetta: "CAP", testo: $cap, mono: true, auto: true).frame(width: 100)
+                CampoTesto(etichetta: "Città", testo: $citta, auto: true).frame(maxWidth: .infinity)
+                CampoTesto(etichetta: "Prov.", testo: $provincia, maiuscole: .characters, auto: true).frame(width: 78)
             }
             HStack(spacing: 4) {
                 IconaTela(d: Ic.spunta, colore: Theme.oliveBright, lato: 12)
@@ -408,6 +414,12 @@ struct MieiDatiView: View {
             }
             .padding(.horizontal, 2).padding(.top, -5)
         }
+    }
+
+    /// tavola 35: icona del calendario rossa quando mancano 30 giorni o meno
+    var scadenzaVicina: Bool {
+        guard let s = scadenza else { return false }
+        return (Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: Date()), to: s).day ?? 0) <= 30
     }
 
     var siglaPrefisso: String { ["+39": "IT", "+378": "SM", "+41": "CH", "+33": "FR", "+49": "DE", "+34": "ES", "+44": "GB", "+1": "US"][prefisso] ?? "" }
@@ -428,7 +440,7 @@ struct MieiDatiView: View {
                             Text(scadenza.map { FormatiHome.giornoLungoAnno.string(from: $0) } ?? "Scegli la data").font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(scadenza == nil ? Theme.dim : Theme.testo)
                             Spacer()
-                            IconaTela(d: Ic.calendario, colore: Theme.dim, lato: 18)
+                            IconaTela(d: Ic.calendario, colore: scadenzaVicina ? Theme.red : Theme.dim, lato: 18)
                         }
                     }
                     .buttonStyle(.plain)
@@ -718,25 +730,19 @@ struct RuotaData: View {
         let cal = Calendar(identifier: .gregorian)
         let k = cal.dateComponents([.year, .month, .day], from: data)
         let anno = Calendar.current.component(.year, from: Date())
+        // tavola 33: 5 righe da 24, una sola fascia evidenziata, anni crescenti verso il basso
         GeometryReader { g in
             HStack(spacing: 0) {
-                ruota(Array(1...31).map(String.init), sel: (k.day ?? 1) - 1) { i in imposta(giorno: i + 1) }.frame(width: g.size.width / 3.6)
-                ruota(Self.mesi, sel: (k.month ?? 1) - 1) { i in imposta(mese: i + 1) }.frame(width: g.size.width * 1.6 / 3.6)
-                ruota(Array((anno - 90)...anno).reversed().map(String.init), sel: anno - (k.year ?? anno)) { i in imposta(anno: anno - i) }.frame(width: g.size.width / 3.6)
+                RulloTela(voci: Array(1...31).map(String.init), sel: (k.day ?? 1) - 1) { i in imposta(giorno: i + 1) }.frame(width: g.size.width / 3)
+                RulloTela(voci: Self.mesi, sel: (k.month ?? 1) - 1) { i in imposta(mese: i + 1) }.frame(width: g.size.width / 3)
+                RulloTela(voci: Array((anno - 90)...anno).map(String.init), sel: (k.year ?? anno) - (anno - 90)) { i in imposta(anno: anno - 90 + i) }.frame(width: g.size.width / 3)
             }
         }
-        .frame(height: 122)
-        .background(alignment: .center) { RoundedRectangle(cornerRadius: 9).fill(Theme.olive.opacity(0.16)).frame(height: 36).padding(.horizontal, 8) }
+        .frame(height: 123)
+        .background(alignment: .center) { RoundedRectangle(cornerRadius: 9).fill(Color(hex: 0x2A3120)).frame(height: 36).padding(.horizontal, 8) }
         .background(Color(hex: 0x11150D), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.stroke))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
-    func ruota(_ voci: [String], sel: Int, _ f: @escaping (Int) -> Void) -> some View {
-        Picker("", selection: Binding(get: { sel }, set: { f($0) })) {
-            ForEach(voci.indices, id: \.self) { i in Text(voci[i]).font(.system(size: 17, weight: .heavy)).foregroundStyle(Theme.testo).tag(i) }
-        }
-        .pickerStyle(.wheel).labelsHidden()
     }
 
     func imposta(giorno: Int? = nil, mese: Int? = nil, anno: Int? = nil) {
@@ -749,6 +755,52 @@ struct RuotaData: View {
         if let d = cal.date(from: DateComponents(year: k.year, month: k.month)), let n = cal.range(of: .day, in: .month, for: d)?.count, (k.day ?? 1) > n { k.day = n }
         if let d = cal.date(from: k) { data = d }
     }
+}
+
+/// un rullo della data come la tavola 33: scelto 17 nero pieno, vicini 15 attenuati, trascina e si aggancia alla riga
+struct RulloTela: View {
+    let voci: [String]
+    let sel: Int
+    let scegli: (Int) -> Void
+    @State private var trascina: CGFloat = 0
+    static let riga: CGFloat = 24
+
+    var body: some View {
+        // posizione "continua" durante il trascinamento
+        let pos = min(max(CGFloat(sel) - trascina / Self.riga, 0), CGFloat(voci.count - 1))
+        let da = max(0, Int(pos) - 3), a = min(voci.count - 1, Int(pos) + 3)
+        ZStack {
+            ForEach(Array(da...a), id: \.self) { i in
+                let d = CGFloat(i) - pos
+                Text(voci[i])
+                    .font(.system(size: abs(d) < 0.5 ? 17 : 15, weight: abs(d) < 0.5 ? .heavy : .semibold))
+                    .foregroundStyle(abs(d) < 0.5 ? Theme.testo : Theme.testo2.opacity(abs(d) < 1.5 ? 0.75 : 0.4))
+                    .offset(y: d * Self.riga)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .gesture(DragGesture()
+            .onChanged { trascina = $0.translation.height }
+            .onEnded { v in
+                let fine = Int((CGFloat(sel) - v.predictedEndTranslation.height / Self.riga).rounded())
+                trascina = 0
+                let n = min(max(fine, 0), voci.count - 1)
+                if n != sel { UISelectionFeedbackGenerator().selectionChanged(); scegli(n) }
+            })
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: sel)
+        .accessibilityElement().accessibilityValue(voci[sel])
+        .accessibilityAdjustableAction { a in
+            if a == .increment, sel < voci.count - 1 { scegli(sel + 1) }
+            if a == .decrement, sel > 0 { scegli(sel - 1) }
+        }
+    }
+}
+
+/// moduli a schermo intero aperti (I miei dati, Salute): finché ce n'è uno la barra in basso sparisce
+final class ModuliAperti: ObservableObject {
+    static let shared = ModuliAperti()
+    @Published var aperti = 0
 }
 
 /// capsule che vanno a capo (allergie)
