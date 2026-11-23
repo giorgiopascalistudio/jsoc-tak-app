@@ -579,12 +579,16 @@ struct SchedaSocioDirettivo: View {
                     Text("\(p.perc)%").font(Theme.mono(17, .heavy)).foregroundStyle(Theme.testo)
                 }
                 .frame(width: 64, height: 64).frame(width: 78, height: 78)
-                Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
-                    GridRow {
+                // tela: griglia 1fr 1fr, spazi 8 (righe) e 10 (colonne)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .top, spacing: 10) {
                         numero("\(p.anno)", "presenze \(AnnoDir.corrente)").frame(maxWidth: .infinity, alignment: .leading)
                         numero("\(p.totali)", "eventi in totale").frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    GridRow { numero("\(p.serie)", "di fila (serie)"); numero(p.ultima.map { FormatiHome.giornoMese.string(from: $0) } ?? "—", "ultima presenza") }
+                    HStack(alignment: .top, spacing: 10) {
+                        numero("\(p.serie)", "di fila (serie)").frame(maxWidth: .infinity, alignment: .leading)
+                        numero(p.ultima.map { FormatiHome.giornoMese.string(from: $0) } ?? "—", "ultima presenza").frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }

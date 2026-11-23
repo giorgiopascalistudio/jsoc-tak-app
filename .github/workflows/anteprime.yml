@@ -50,7 +50,7 @@ jobs:
             fi
             shot 47-direttivo 10 -debug.tab 3
             shot 48-soci 10 -debug.tab 3 -debug.dir.apri soci -debug.dir.scorri LILLO
-            shot 49-scheda 10 -debug.tab 3 -debug.dir.apri scheda
+            shot 49-scheda 14 -debug.tab 3 -debug.dir.apri scheda
             shot 50-movimento 10 -debug.tab 3 -debug.dir.apri movimento
             shot 51-spesa 10 -debug.tab 3 -debug.dir.apri spesa
             xcrun simctl shutdown "$DEV" || true
