@@ -47,6 +47,13 @@ enum Ic {
     static let spunta = "M5 12l4 4 10-10"
     static let piu = "M12 5v14 M5 12h14"
     static let cerca = "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z M20 20l-4-4"
+    static let bacchetta = "M5 19 19 5 M15 4v2 M18 7h2 M14 9l1 1"
+    static let giu = "M6 9l6 6 6-6"
+    static let telefono = "M5 3h4l2 5-3 2a12 12 0 0 0 6 6l2-3 5 2v4a2 2 0 0 1-2 2A17 17 0 0 1 3 5a2 2 0 0 1 2-2Z"
+    static let posta = "M3 5h18v14H3Z M3 6l9 7 9-7"
+    static let segnaposto = "M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12Z M12 7v4"
+    static let fotocamera = "M4 7h4l2-3h4l2 3h4v12H4Z M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"
+    static let libro = "M5 4h12a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2Z M5 18a2 2 0 0 1 2-2h12"
 }
 
 /// Interprete dei percorsi SVG (M L H V C S Q T A Z, maiuscole e minuscole) → Path di SwiftUI, scalato sul riquadro.

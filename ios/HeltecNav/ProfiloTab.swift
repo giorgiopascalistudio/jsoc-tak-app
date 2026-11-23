@@ -4,7 +4,7 @@ import PhotosUI
 // MARK: - Scheda Profilo
 
 /// Moduli dei miei dati e della salute (dai riquadri del Profilo). Da rifare sulle tavole 33-36.
-struct MieiDatiView: View {
+struct ModuloProfiloVecchio: View {
     var salute = false
     @ObservedObject private var jsoc = JsocClient.shared
     @ObservedObject private var store = EventoStore.shared

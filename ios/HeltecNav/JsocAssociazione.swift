@@ -24,6 +24,18 @@ struct JProfilo: Codable, Hashable, Identifiable {
     var gruppi: [Int]?
     var quota_pagata: Int?
     var quote: [JQuotaMia]?
+    // server 0.19 (tavole 33-36)
+    var cognome: String?
+    var sesso: String?
+    var provincia_nascita: String?
+    var cap: String?
+    var citta: String?
+    var provincia: String?
+    var certificato_tipo: String?
+    var certificato_file: String?
+    var allergie: String?
+    var farmaci: String?
+    var emergenza_visibile: String?
 
     var direttivo: Bool { ruolo == "direttivo" }
     /// giorni alla scadenza del certificato (negativo = scaduto, nil = non inserito)
