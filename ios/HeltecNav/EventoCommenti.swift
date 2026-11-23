@@ -129,7 +129,9 @@ struct CommentiEventoV3: View {
     @ViewBuilder func bolla(_ k: JCommentoEvento) -> some View {
         let mio = k.autore == io
         let citato = k.risposta_a.flatMap { id in commenti.first { $0.id == id } }
-        let contenuto = VStack(alignment: .leading, spacing: 0) {
+        // la bolla si stringe sul testo: blocco a sinistra + ora allineata a destra (niente Spacer, che la allargherebbe)
+        let contenuto = VStack(alignment: .trailing, spacing: 0) {
+          VStack(alignment: .leading, spacing: 0) {
             if !mio {
                 Text(k.callsign ?? "?").font(Theme.mono(11, .heavy)).foregroundStyle(Theme.oliveBright)
             }
@@ -140,8 +142,8 @@ struct CommentiEventoV3: View {
                     .padding(.top, 3).padding(.bottom, 5)
             }
             Text(k.testo).font(.system(size: 13.5)).foregroundStyle(Theme.testo).lineSpacing(2.5).fixedSize(horizontal: false, vertical: true)
+          }
             HStack(spacing: 4) {
-                Spacer(minLength: 0)
                 if k.modificato != nil { Text("modificato ·").font(.system(size: 10)).foregroundStyle(Theme.dim) }
                 Text(FormatiEventi.ora.string(from: Date(timeIntervalSince1970: k.ts))).font(.system(size: 10)).foregroundStyle(Theme.dim)
             }
