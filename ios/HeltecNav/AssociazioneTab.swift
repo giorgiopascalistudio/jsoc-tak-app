@@ -20,7 +20,7 @@ struct AssociazioneTab: View {
         }
     }
 
-    var contenuto: some View { AssociazioneHomeV2() }
+    @ViewBuilder var contenuto: some View { if direttivo { AssociazioneDirettivoV3() } else { AssociazioneHomeV2() } }   // direttivo: tavole 47-51
 
     func conta(_ n: Int?, _ t: String) -> String { (n ?? 0) > 0 ? "\(n!) \(t)" : "tutto letto" }
 
