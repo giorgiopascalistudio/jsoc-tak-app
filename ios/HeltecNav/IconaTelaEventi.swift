@@ -3,7 +3,6 @@ import SwiftUI
 /// Icone delle tavole 37-42 (sezione Eventi): stessi percorsi SVG della tela.
 extension Ic {
     static let indietroCopertina = "M15 18l-6-6 6-6"
-    static let puntini = "M5 12h.01 M12 12h.01 M19 12h.01"
     static let spuntaGrossa = "M20 6 9 17l-5-5"
     static let lucchetto = "M6 11h12v10H6Z M8.5 11V8a3.5 3.5 0 0 1 7 0v3"
     static let documentoRighe = "M6 3h9l4 4v14H6Z M14 3v5h5 M9 12h7 M9 16h7"

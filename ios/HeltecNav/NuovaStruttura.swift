@@ -178,69 +178,10 @@ struct ContenitoreSchede: View {
     }
 }
 
-// MARK: - Strumenti (da campo e intelligence)
+// MARK: - Strumenti: tavola 64 (StrumentiV3.swift)
 
 struct StrumentiTab: View {
-    var body: some View {
-        let _ = Contatori.disegno("StrumentiTab")
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    EtichettaSezione(testo: "Da campo")
-                    griglia([
-                        voce("scope", "Mirino con azimut", "rilevamenti con la bussola") { AnyView(MirinoView()) },
-                        voce("triangle", "Triangolazione", "da due o tre rilevamenti") { AnyView(TriangView()) },
-                        voce("ruler", "Telemetro", "distanze dalla fotocamera") { AnyView(TelemetroView()) },
-                        voce("map", "Campo", "coordinate e conversioni") { AnyView(CampoView()) },
-                        voce("target", "Balistica BB", "caduta e tempo di volo") { AnyView(PannelloBalistica(chiudi: {})) },
-                        voce("cross.case.fill", "Primo soccorso", "MARCH passo passo") { AnyView(PannelloMedico(chiudi: {})) },
-                        voce("archivebox.fill", "Archivio personale", "tracce GPS e pacchetti coordinate") { AnyView(ArchivioPersonaleView()) },
-                    ])
-                    EtichettaSezione(testo: "Intelligence")
-                    griglia([
-                        voce("lock.open.fill", "Cifrari e decodifiche", "Cesare, Vigenère, Morse, catene") { AnyView(CipherTab()) },
-                        voce("qrcode.viewfinder", "Raccolta dal campo", "foto, audio, QR") { AnyView(KitTab()) },
-                    ])
-                    EtichettaSezione(testo: "Giochi e missioni")
-                    griglia([
-                        voce("bolt.shield.fill", "Prove pronte", "bomba, enigmi, cifrari, quiz: scegli e via") { AnyView(ProvePronteView()) },
-                        voce("flag.checkered", "Missioni (fasi E)", "fasi, codici, QR, GPS, indizi, rami") { AnyView(MissioniView()) },
-                        voce("flame.fill", "Giochi da campo", "bomba, bandiera, nucleare, terminale") { AnyView(GiochiCampoView()) },
-                    ])
-                }
-                .padding(14)
-                .padding(.bottom, 70)
-            }
-            .background(Theme.bg.ignoresSafeArea())
-            .navigationTitle("Strumenti")
-        }
-    }
-
-    struct Voce: Identifiable { let id: String; let icona: String; let sotto: String; let vista: () -> AnyView }
-
-    func voce(_ icona: String, _ titolo: String, _ sotto: String, _ v: @escaping () -> AnyView) -> Voce {
-        Voce(id: titolo, icona: icona, sotto: sotto, vista: v)
-    }
-
-    func griglia(_ voci: [Voce]) -> some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 10)], spacing: 10) {
-            ForEach(Array(voci.enumerated()), id: \.element.id) { i, v in
-                NavigationLink { v.vista().background(Theme.bg.ignoresSafeArea()).navigationTitle(v.id).navigationBarTitleDisplayMode(.inline) } label: {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Image(systemName: v.icona).font(.system(size: 22, weight: .semibold)).foregroundStyle(Theme.oliveBright)
-                        Text(v.id).font(.system(size: 14, weight: .heavy)).foregroundStyle(.white).multilineTextAlignment(.leading)
-                        Text(v.sotto).font(.system(size: 11)).foregroundStyle(Theme.dim).multilineTextAlignment(.leading)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 104, alignment: .topLeading)
-                    .padding(12)
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
-                    .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.stroke))
-                }
-                .buttonStyle(PressStyle())
-                .comparsa(i)
-            }
-        }
-    }
+    var body: some View { StrumentiV3() }
 }
 
 // MARK: - Aiuti per gli eventi
