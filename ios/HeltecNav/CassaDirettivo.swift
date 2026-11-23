@@ -272,8 +272,11 @@ struct NuovoMovimentoV3: View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
             ForEach(["1", "2", "3", "4", "5", "6", "7", "8", "9", ",", "0", "⌫"], id: \.self) { k in
                 Button { premi(k) } label: {
-                    Text(k).font(Theme.mono(19, .heavy)).foregroundStyle(Theme.testo)
-                        .frame(maxWidth: .infinity).frame(height: 46)
+                    Group {
+                        if k == "⌫" { Image(systemName: "delete.left").font(.system(size: 19, weight: .heavy)) } else { Text(k).font(Theme.mono(19, .heavy)) }
+                    }
+                    .foregroundStyle(Theme.testo)
+                    .frame(maxWidth: .infinity).frame(height: 46)
                         .background(Theme.surface2, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
                 .buttonStyle(PressStyle())

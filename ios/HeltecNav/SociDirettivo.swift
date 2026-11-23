@@ -394,11 +394,11 @@ struct SchedeFlessDir: View {
             ForEach(voci.indices, id: \.self) { i in
                 Button { haptic(.soft); withAnimation(.easeOut(duration: 0.15)) { scelta = i } } label: {
                     Text(voci[i]).font(.system(size: 13, weight: .heavy)).lineLimit(1).fixedSize()
+                        .padding(.horizontal, 6)   // tela: i bottoni hanno 6 di margine interno (min-content)
                         .foregroundStyle(i == scelta ? Theme.scuro : Theme.testo2)
                         .frame(maxWidth: .infinity).frame(height: 38)
                         .background(i == scelta ? Theme.testo : .clear, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .padding(.horizontal, 0)
-                }
+                                        }
                 .buttonStyle(.plain)
             }
         }
@@ -580,7 +580,10 @@ struct SchedaSocioDirettivo: View {
                 }
                 .frame(width: 64, height: 64).frame(width: 78, height: 78)
                 Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
-                    GridRow { numero("\(p.anno)", "presenze \(AnnoDir.corrente)"); numero("\(p.totali)", "eventi in totale") }
+                    GridRow {
+                        numero("\(p.anno)", "presenze \(AnnoDir.corrente)").frame(maxWidth: .infinity, alignment: .leading)
+                        numero("\(p.totali)", "eventi in totale").frame(maxWidth: .infinity, alignment: .leading)
+                    }
                     GridRow { numero("\(p.serie)", "di fila (serie)"); numero(p.ultima.map { FormatiHome.giornoMese.string(from: $0) } ?? "—", "ultima presenza") }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -660,8 +663,9 @@ struct SchedaSocioDirettivo: View {
         let colore = pagata ? Theme.oliveBright : Theme.amber
         return HStack(spacing: 11) {
             Text(String(q.anno)).font(Theme.mono(15, .heavy)).foregroundStyle(Theme.testo).frame(width: 44, alignment: .leading)
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
                 TagDir(testo: (pagata ? "PAGATA" : "DA PAGARE") + (q.importo.map { " · " + euroTondo($0) } ?? ""), colore: colore, dimensione: 9.5, orizzontale: 7)
+                    .frame(height: 22)   // tela: etichetta in linea dentro una riga di testo da 16
                 Text(sotto.joined(separator: " · ")).font(.system(size: 11)).foregroundStyle(Theme.dim).fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)

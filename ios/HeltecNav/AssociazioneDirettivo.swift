@@ -287,7 +287,7 @@ struct AssociazioneDirettivoV3: View {
                 HStack(spacing: 11) {
                     Text("\(v.numero)").font(Theme.mono(14, .heavy)).foregroundStyle(v.colore)
                         .frame(minWidth: 30, minHeight: 30).background(v.colore.opacity(0.15), in: Capsule())
-                    Text(v.testo).font(.system(size: 13.5, weight: .bold)).foregroundStyle(Theme.testo).lineSpacing(1.6)
+                    Text(v.testo).font(.system(size: 13.5, weight: .bold)).foregroundStyle(Theme.testo).lineSpacing(2.4)
                         .frame(maxWidth: .infinity, alignment: .leading).fixedSize(horizontal: false, vertical: true)
                     v.tasto
                 }
