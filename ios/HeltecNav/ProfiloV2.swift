@@ -12,6 +12,7 @@ struct ProfiloTab: View {
     @State private var qr = false
     @State private var esci = false
     @State private var dispositivo = false
+    @State private var moduloDebug = UserDefaults.standard.string(forKey: "debug.modulo") != nil
 
     var body: some View {
         let _ = Contatori.disegno("ProfiloTab")
@@ -21,6 +22,8 @@ struct ProfiloTab: View {
             }
             .background(Theme.bg.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
+            // anteprime: -debug.modulo dati|salute (+ -debug.scheda 1) apre direttamente il modulo
+            .navigationDestination(isPresented: $moduloDebug) { MieiDatiView(salute: UserDefaults.standard.string(forKey: "debug.modulo") == "salute") }
         }
         .sheet(isPresented: $qr) { QRAppello() }
         .sheet(isPresented: $dispositivo) { InvitoSheet(dispositivo: true) }

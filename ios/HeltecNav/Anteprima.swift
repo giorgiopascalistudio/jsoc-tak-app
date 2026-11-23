@@ -43,7 +43,12 @@ enum Anteprima {
     static var profilo: JProfilo {
         var p = JProfilo(id: 1, nome: "Giorgio Pascali", callsign: "GREG", ruolo: "direttivo")
         p.email = "giorgio@esempio.it"; p.telefono = "+39 333 1234567"; p.nascita = "1990-03-12"; p.luogo_nascita = "Lecce"
-        p.cf = "PSCGRG90C12E506X"; p.gruppo_sanguigno = "A+"; p.emergenza = "Maria R. +39 333 7654321"
+        p.cf = "PSCGRG90C12E506X"; p.gruppo_sanguigno = "0+"; p.emergenza = "Maria R.|madre|+39 333 765 4321"
+        // tavole 33-36
+        p.cognome = "Pascali"; p.sesso = "M"; p.provincia_nascita = "LE"; p.telefono = "+39 333 123 4567"
+        p.indirizzo = "via Roma 12"; p.cap = "73100"; p.citta = "Lecce"; p.provincia = "LE"
+        p.certificato_tipo = "non agonistico"; p.certificato_file = "certificato.jpg"
+        p.allergie = "Penicillina"; p.farmaci = "Nessuno"; p.emergenza_visibile = "1"
         p.certificato_scadenza = String(giorno(18, 0).prefix(10))
         p.quote = [JQuotaMia(anno: Calendar.current.component(.year, from: Date()) + 1, importo: 40, pagata: 0, data: nil)]
         return p

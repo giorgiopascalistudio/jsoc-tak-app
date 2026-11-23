@@ -213,7 +213,7 @@ enum CodiceFiscale {
 struct MieiDatiView: View {
     var salute = false
     @ObservedObject private var jsoc = JsocClient.shared
-    @State private var scheda = 0
+    @State private var scheda = UserDefaults.standard.integer(forKey: "debug.scheda")
     @State private var salvato = false
     @State private var errore: String?
     // anagrafica
@@ -225,7 +225,7 @@ struct MieiDatiView: View {
     @State private var comuneScelto: ComuniIT.Comune?
     @State private var cf = ""
     @State private var cfAMano = false
-    @State private var ruotaAperta = false
+    @State private var ruotaAperta = UserDefaults.standard.string(forKey: "debug.modulo") == "dati"  // tavola 33: rotella aperta
     // contatti
     @State private var prefisso = "+39"
     @State private var telefono = ""
@@ -752,7 +752,7 @@ struct RuotaData: View {
 }
 
 /// capsule che vanno a capo (allergie)
-struct FlussoCapsule: Layout {
+struct FlussoCapsule: SwiftUI.Layout {
     var spazio: CGFloat = 6
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let w = proposal.width ?? 360
