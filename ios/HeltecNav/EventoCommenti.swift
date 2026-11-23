@@ -154,14 +154,14 @@ struct CommentiEventoV3: View {
                 Spacer(minLength: 0)
                 contenuto
                     .background(Color(hex: 0x3A4A24), in: AngoliTela(tl: 16, tr: 16, br: 5, bl: 16))
-                    .frame(maxWidth: 262, alignment: .trailing)
+                    .frame(maxWidth: 288, alignment: .trailing)
                     .contextMenu { menu(k, mio: true) }
             } else {
                 TondoIniziali(testo: inizialiCommento(k.callsign), lato: 32)
                 contenuto
                     .background(Theme.surface, in: AngoliTela(tl: 16, tr: 16, br: 16, bl: 5))
                     .overlay(AngoliTela(tl: 16, tr: 16, br: 16, bl: 5).stroke(Theme.olive.opacity(0.2), lineWidth: 1))
-                    .frame(maxWidth: 262, alignment: .leading)
+                    .frame(maxWidth: 288, alignment: .leading)
                     .contextMenu { menu(k, mio: false) }
                 Spacer(minLength: 0)
             }

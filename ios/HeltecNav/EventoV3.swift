@@ -298,8 +298,8 @@ struct EventoV3: View {
                 ForEach(0..<3, id: \.self) { i in
                     if i < t.count {
                         VStack(alignment: .leading, spacing: 0) {
-                            Text(t[i].0).font(Theme.mono(14, .heavy)).foregroundStyle(t[i].2).lineLimit(1).minimumScaleFactor(0.7)
-                            Text(t[i].1).font(.system(size: 9.5, weight: .bold)).foregroundStyle(Theme.dim).lineLimit(1).minimumScaleFactor(0.7)
+                            Text(t[i].0).font(Theme.mono(14, .heavy)).foregroundStyle(t[i].2).lineLimit(1).fixedSize()
+                            Text(t[i].1).font(.system(size: 9.5, weight: .bold)).foregroundStyle(Theme.dim).lineLimit(1)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading).padding(8)
                         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -390,7 +390,7 @@ struct EventoV3: View {
                 Spacer()
                 if !commenti.isEmpty { Text("Tutti ›").font(.system(size: 11.5, weight: .heavy)).foregroundStyle(Theme.cyan) }
             }
-            ForEach(commenti.sorted { $0.ts > $1.ts }.prefix(2)) { k in
+            ForEach(commenti.filter { $0.autore != io }.sorted { $0.ts > $1.ts }.prefix(2)) { k in
                 HStack(alignment: .top, spacing: 8) {
                     TondoIniziali(testo: inizialiCommento(k.callsign), lato: 26)
                     VStack(alignment: .leading, spacing: 0) {
@@ -553,7 +553,7 @@ struct EventoV3: View {
 
     var menuAzioni: some View {
         ZStack(alignment: .bottom) {
-            Color.black.opacity(0.55).ignoresSafeArea()
+            ZStack { Theme.bg.opacity(0.65); Color.black.opacity(0.55) }.ignoresSafeArea()
                 .onTapGesture { withAnimation(.easeOut(duration: 0.2)) { azioni = false } }
             VStack(alignment: .leading, spacing: 0) {
                 Capsule().fill(Color(hex: 0x3A4130)).frame(width: 40, height: 5).frame(maxWidth: .infinity).padding(.top, 2).padding(.bottom, 8)
@@ -678,7 +678,7 @@ struct EventoV3: View {
 
     func carica() async {
         if Anteprima.attiva {
-            presenze = e.id == Anteprima.idTappa ? Anteprima.presenzeTappa : nil
+            presenze = Anteprima.presenzeEvento(e.id)
             commenti = Anteprima.commentiEvento(e.id)
             if dentro { riepilogo = Anteprima.riepilogoEvento }
             return

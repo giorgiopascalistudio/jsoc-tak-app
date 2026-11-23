@@ -168,7 +168,9 @@ struct NuovoEventoV3: View {
                         }
                         chip("Altro luogo…", on: false) { luogo = ""; lat = nil; lon = nil; fuocoLuogo = true }
                     }
+                    .padding(.horizontal, 14)
                 }
+                .padding(.horizontal, -14)   // la fila scorre fino al bordo dello schermo, come nella tavola
                 .padding(.top, 6)
             }
             VStack(alignment: .leading, spacing: 4) {
@@ -401,7 +403,7 @@ struct NuovoEventoV3: View {
 
     func riempi() {
         guard !pronto else { return }
-        defer { pronto = true; if nome.isEmpty { suggerisci() } }
+        defer { DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { pronto = true; if nome.isEmpty { suggerisci() } } }
         if Anteprima.attiva && modifica == nil && base == nil {
             // tavola 42
             tipo = "allenamento"; nome = "Domenicale CQB"; luogo = "Campo Calimera"; interno = 0

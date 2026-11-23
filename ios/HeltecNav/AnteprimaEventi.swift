@@ -50,6 +50,13 @@ extension Anteprima {
         return b
     }
 
+    /// tavole 38-40: chi ha risposto (tavola 40: "5 soci" senza risposta)
+    static func presenzeEvento(_ ev: Int) -> JPresenze? {
+        if ev == idTappa { return presenzeTappa }
+        if ev == 101 { return JPresenze(presenze: [], conta: JPresenze.Conta(si: 12, no: 1, forse: 0, senza_risposta: 5, attesa: 0, arbitro: 0)) }
+        return nil
+    }
+
     /// tavole 38-39: chi ha risposto
     static var presenzeTappa: JPresenze {
         let si = UserDefaults.standard.string(forKey: "debug.eventi.risposta") == "si"
@@ -67,7 +74,9 @@ extension Anteprima {
         return [
             JCommentoEvento(id: 1, testo: "Porto io le cariche delle radio, ne ho 6.", ts: ts(-1, 18, 40), autore: 7, callsign: "RAVEN"),
             JCommentoEvento(id: 2, testo: "Chi ha posto in macchina da Lecce? Siamo in 2.", ts: ts(-1, 19, 2), autore: 8, callsign: "WOLF"),
-            JCommentoEvento(id: 3, testo: "Io ho 3 posti, partenza 7:30 da piazza Mazzini.", ts: ts(-1, 19, 10), autore: utente.id, callsign: utente.callsign, risposta_a: 2),
+            ev == idTappa   // tavola 38: "4 nuovi", tutti di altri
+                ? JCommentoEvento(id: 3, testo: "Iscrizione fatta, quota pagata.", ts: ts(-1, 17, 30), autore: 10, callsign: "VIPER")
+                : JCommentoEvento(id: 3, testo: "Io ho 3 posti, partenza 7:30 da piazza Mazzini.", ts: ts(-1, 19, 10), autore: utente.id, callsign: utente.callsign, risposta_a: 2),
             JCommentoEvento(id: 4, testo: ev == idTappa ? "Ricordate occhiali omologati: senza non si entra." : "Ricordate occhiali omologati: senza non si entra in campo.",
                             ts: ts(0, 8, 15), autore: 9, callsign: "DIRETTIVO"),
         ]
