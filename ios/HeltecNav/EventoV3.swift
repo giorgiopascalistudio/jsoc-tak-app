@@ -193,6 +193,7 @@ struct EventoV3: View {
             if let h = e.host, !h.isEmpty { Text("Host: \(h)").font(.system(size: 12.5)).foregroundStyle(Theme.dim) }
             info
             tessere
+            Group {
             if e.annullato { cartello("Evento annullato: resta in archivio, non conta nelle presenze", Theme.red) }
             if e.privato { nascosto }
             if e.proposto && !e.privato { proposta }
@@ -200,6 +201,7 @@ struct EventoV3: View {
             if mia == "attesa" { Text("Posti finiti: sei in lista d'attesa, entri appena qualcuno si ritira.").font(.system(size: 11.5, weight: .bold)).foregroundStyle(Theme.amber) }
             if let avviso { Text(avviso).font(.system(size: 11.5, weight: .bold)).foregroundStyle(Theme.oliveBright) }
             if let errore { Text(errore).font(.system(size: 11.5, weight: .bold)).foregroundStyle(Theme.red) }
+            }
             if !e.proposto { conteggi }
             riquadroCommenti
             if !e.proposto {
