@@ -19,7 +19,7 @@ enum Anteprima {
     }
 
     static func eventi() -> [JEvento] {
-        [
+        conEventiTavole([
             JEvento(id: 101, nome: "Domenicale CQB", tipo: "allenamento", inizio: giorno(2, 8, 30), fine: giorno(2, 13), luogo: "Campo Calimera",
                     lat: 40.2503, lon: 18.2789, note: nil, archiviato: 0, mio_ruolo: "operatore", mia_risposta: nil,
                     interno: 1, stato: "approvato", scadenza: giorno(1, 20), posti: nil, quota: nil, n_si: 12),
@@ -30,7 +30,7 @@ enum Anteprima {
                     interno: 0, stato: "approvato", scadenza: giorno(5, 20), posti: 12, quota: 25, n_si: 9),
             JEvento(id: 104, nome: "Assemblea ordinaria", tipo: "associazione", inizio: giorno(15, 18), fine: giorno(15, 20), luogo: "Sede",
                     lat: nil, lon: nil, note: nil, archiviato: 0, mio_ruolo: "operatore", mia_risposta: "si", stato: "approvato", n_si: 14),
-        ]
+        ])
     }
 
     static let home = JHome(

@@ -11,6 +11,7 @@ struct JCommentoEvento: Codable, Identifiable, Hashable {
     let autore: Int
     var callsign: String? = nil
     var nome: String? = nil
+    var risposta_a: Int? = nil        // tavola 41: commento a cui risponde (citazione)
 }
 
 struct JAttrezzo: Codable, Identifiable, Hashable {

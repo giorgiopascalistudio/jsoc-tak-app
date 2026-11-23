@@ -95,6 +95,7 @@ struct JEvento: Codable, Identifiable, Hashable {
     var n_attesa: Int? = nil
     var nascosto: Int? = nil
     var creato_da: Int? = nil
+    var breve: String? = nil          // tavola 37: nota corta nella riga ("solo direttivo", "deleghe aperte")
     var privato: Bool { (nascosto ?? 0) != 0 }
     var annullato: Bool { stato == "annullato" }
     var punti: [JPunto]? = nil

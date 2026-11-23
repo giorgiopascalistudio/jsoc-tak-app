@@ -48,17 +48,12 @@ jobs:
               osascript -e 'tell application "Simulator" to activate' -e 'delay 1'                 -e 'tell application "System Events" to tell process "Simulator" to click menu item "Rotate Right" of menu "Device" of menu bar 1' || echo "rotazione non riuscita"
               sleep 3
             fi
-            shot home 12 -debug.tab 0 $L
-            shot eventi 6 -debug.tab 2 $L
-            shot associazione 6 -debug.tab 3 $L
-            shot strumenti 6 -debug.tab 5 $L
-            shot profilo 8 -debug.tab 4 $L
-            if [ "$N" != "iPadProinch" ]; then
-              shot 33-dati 9 -debug.tab 4 -debug.modulo dati -debug.scheda 0
-              shot 34-datiB 9 -debug.tab 4 -debug.modulo dati -debug.scheda 1
-              shot 35-salute 9 -debug.tab 4 -debug.modulo salute -debug.scheda 0
-              shot 36-saluteB 9 -debug.tab 4 -debug.modulo salute -debug.scheda 1
-            fi
+            shot 37-eventi 9 -debug.tab 2
+            shot 38-evento 9 -debug.tab 2 -debug.eventi.apri dettaglio -debug.eventi.risposta nessuna
+            shot 39-eventoPresente 9 -debug.tab 2 -debug.eventi.apri dettaglio -debug.eventi.risposta si
+            shot 40-eventoAzioni 9 -debug.tab 2 -debug.eventi.apri azioni
+            shot 41-eventoCommenti 9 -debug.tab 2 -debug.eventi.apri commenti
+            shot 42-nuovoEvento 9 -debug.tab 2 -debug.eventi.apri nuovo
             xcrun simctl shutdown "$DEV" || true
           done
           ls shots
