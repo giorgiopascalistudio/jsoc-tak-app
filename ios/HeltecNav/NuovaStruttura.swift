@@ -170,7 +170,7 @@ struct ContenitoreSchede: View {
     @ViewBuilder func vista(_ t: Int) -> some View {
         switch t {
         case Schede.home: HomeV3()
-        case Schede.eventi: EventiV2()
+        case Schede.eventi: EventiV3()
         case Schede.associazione: AssociazioneTab()
         case Schede.strumenti: StrumentiTab()
         default: ProfiloTab()

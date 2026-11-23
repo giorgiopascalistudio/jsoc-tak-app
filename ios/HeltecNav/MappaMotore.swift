@@ -358,7 +358,8 @@ final class ConoUtente: MLNUserLocationAnnotationView {
     private let maschera = CAShapeLayer()
     private let punto = CAShapeLayer()
     private let lato: CGFloat = 150
-    private let blu = UIColor(red: 0.2, green: 0.55, blue: 1, alpha: 1)
+    /// tavola 10: la mia posizione è verde oliva (#9AAE5B), non blu
+    private let blu = UIColor(red: 0.604, green: 0.682, blue: 0.357, alpha: 1)
 
     override func update() {
         if frame.width != lato {
@@ -396,7 +397,7 @@ final class ConoUtente: MLNUserLocationAnnotationView {
 
         cono.frame = b
         cono.type = .radial
-        cono.colors = [blu.withAlphaComponent(0.8).cgColor, blu.withAlphaComponent(0).cgColor]
+        cono.colors = [blu.withAlphaComponent(0.75).cgColor, blu.withAlphaComponent(0).cgColor]
         cono.startPoint = CGPoint(x: 0.5, y: 0.5)
         cono.endPoint = CGPoint(x: 1, y: 1)
         let p = UIBezierPath()
@@ -409,7 +410,8 @@ final class ConoUtente: MLNUserLocationAnnotationView {
         layer.addSublayer(cono)
 
         punto.frame = b
-        punto.path = UIBezierPath(ovalIn: CGRect(x: c.x - 9, y: c.y - 9, width: 18, height: 18)).cgPath
+        // tavola 10: pallino 20×18 con angoli da 10 e bordo bianco da 3
+        punto.path = UIBezierPath(roundedRect: CGRect(x: c.x - 11.5, y: c.y - 10.5, width: 23, height: 21), cornerRadius: 10.5).cgPath
         punto.fillColor = blu.cgColor
         punto.strokeColor = UIColor.white.cgColor
         punto.lineWidth = 3

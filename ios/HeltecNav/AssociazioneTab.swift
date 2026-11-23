@@ -6,6 +6,7 @@ import QuickLook
 struct AssociazioneTab: View {
     @ObservedObject private var jsoc = JsocClient.shared
     @ObservedObject private var home = HomeModel.shared
+    @ObservedObject private var perm = PermessiStore.shared
 
     var direttivo: Bool { jsoc.utente?.direttivo == true }
 
@@ -20,7 +21,11 @@ struct AssociazioneTab: View {
         }
     }
 
-    var contenuto: some View { AssociazioneHomeV2() }
+    /// smistamento: il socio normale vede la tavola Associazione10 (AssociazioneSocio, tavole 43-46),
+    /// il direttivo e chi ha aree di gestione la vista del direttivo (AssociazioneDirettivoV3, tavole 47-51).
+    @ViewBuilder var contenuto: some View {
+        if VistaSocio.attiva { AssociazioneSocio() } else { AssociazioneDirettivoV3() }
+    }
 
     func conta(_ n: Int?, _ t: String) -> String { (n ?? 0) > 0 ? "\(n!) \(t)" : "tutto letto" }
 
@@ -321,7 +326,11 @@ struct SociView: View {
         List {
             let soci = (dati?.soci ?? []).filter { cerca.isEmpty || ($0.callsign + " " + $0.nome).localizedCaseInsensitiveContains(cerca) }
             ForEach(soci) { s in
-                NavigationLink { SocioView(socio: s, gruppi: dati?.gruppi ?? []) { _ in Task { await carica() } } } label: {
+                NavigationLink {
+                    // il socio normale vede solo i contatti (tavola SchedaSocioSocio10)
+                    if VistaSocio.attiva { SchedaSocioSocio(socio: s, gruppi: dati?.gruppi ?? []) }
+                    else { SocioView(socio: s, gruppi: dati?.gruppi ?? []) { _ in Task { await carica() } } }
+                } label: {
                     HStack(spacing: 10) {
                         FotoSocio(id: s.id, iniziali: s.callsign, lato: 38)
                         VStack(alignment: .leading, spacing: 2) {

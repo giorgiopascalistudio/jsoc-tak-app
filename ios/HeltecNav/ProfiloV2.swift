@@ -176,7 +176,7 @@ struct ProfiloTab: View {
             Riquadro(icona: Ic.ingranaggio, colore: Theme.dim, titolo: "Impostazioni", sotto: "Posizione, notte, server") { AnyView(ImpostazioniProfilo()) },
             Riquadro(icona: Ic.dispositivi, colore: Theme.dim, titolo: "Dispositivi", sotto: (s?.dispositivi ?? []).compactMap(\.nome).prefix(2).joined(separator: " · ").ifEmpty("Collega iPad o orologio"),
                      segno: disp > 0 ? "\(disp)" : nil) { AnyView(DispositiviProfilo()) },
-            Riquadro(icona: Ic.documento, colore: Theme.oliveBright, titolo: "Documenti", sotto: "Tessera, certificato, assicurazione") { AnyView(SchedaSocioView(id: id)) },
+            Riquadro(icona: Ic.documento, colore: Theme.oliveBright, titolo: "Documenti", sotto: "Tessera, certificato, assicurazione") { AnyView(DocumentiSocioView()) },
         ]
     }
 

@@ -55,7 +55,7 @@ struct HomeV3: View {
             }
             .background(Theme.bg.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
-            .navigationDestination(for: JEvento.self) { EventoScheda(evento: $0) }
+            .navigationDestination(for: JEvento.self) { EventoV3(evento: $0) }
         }
         .sheet(isPresented: $profilo) { ProfiloTab() }
         .sheet(isPresented: $notifiche) { CentroNotifiche(apri: { e in notifiche = false; percorso.append(e) }) }

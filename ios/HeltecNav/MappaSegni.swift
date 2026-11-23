@@ -32,14 +32,14 @@ struct SegnoMappa: Equatable {
 
 enum DisegnoSegni {
     static func gruppo(_ n: Int) -> UIImage {
-        let lato: CGFloat = n >= 10 ? 34 : 30
+        let lato: CGFloat = n >= 10 ? 27 : 23     // tavola 10: cerchio r 10 con bordo 1,5
         return UIGraphicsImageRenderer(size: CGSize(width: lato, height: lato)).image { _ in
             let r = CGRect(x: 1.5, y: 1.5, width: lato - 3, height: lato - 3)
             UIColor(Theme.red).withAlphaComponent(0.94).setFill()
             let p = UIBezierPath(ovalIn: r); p.fill()
-            UIColor.black.setStroke(); p.lineWidth = 1.5; p.stroke()
+            UIColor(white: 0.043, alpha: 1).setStroke(); p.lineWidth = 1.5; p.stroke()
             let t = (n >= 60 ? "60+" : "+\(n)") as NSString
-            let att: [NSAttributedString.Key: Any] = [.font: UIFont.monospacedSystemFont(ofSize: 11.5, weight: .heavy), .foregroundColor: UIColor.black]
+            let att: [NSAttributedString.Key: Any] = [.font: UIFont.monospacedSystemFont(ofSize: 9, weight: .heavy), .foregroundColor: UIColor(white: 0.067, alpha: 1)]
             let s = t.size(withAttributes: att)
             t.draw(at: CGPoint(x: (lato - s.width) / 2, y: (lato - s.height) / 2), withAttributes: att)
         }
@@ -59,12 +59,15 @@ enum DisegnoSegni {
             }
             g.setStrokeColor(UIColor.black.cgColor)
             g.setFillColor(s.colore.cgColor)
+            UIColor(white: 0.043, alpha: 1).setStroke()
             switch s.forma {
             case .rombo:
+                // tavola 10: quadrato di 16 pt ruotato di 45°, bordo 1,5
+                let d: CGFloat = 8 * 1.41421
                 let p = UIBezierPath()
-                p.move(to: CGPoint(x: c.x, y: c.y - 13)); p.addLine(to: CGPoint(x: c.x + 13, y: c.y))
-                p.addLine(to: CGPoint(x: c.x, y: c.y + 13)); p.addLine(to: CGPoint(x: c.x - 13, y: c.y)); p.close()
-                p.lineWidth = 2; p.fill(); p.stroke()
+                p.move(to: CGPoint(x: c.x, y: c.y - d)); p.addLine(to: CGPoint(x: c.x + d, y: c.y))
+                p.addLine(to: CGPoint(x: c.x, y: c.y + d)); p.addLine(to: CGPoint(x: c.x - d, y: c.y)); p.close()
+                p.lineWidth = 1.5; p.fill(); p.stroke()
             case .triangolo:
                 let p = UIBezierPath()
                 p.move(to: CGPoint(x: c.x, y: c.y - 12)); p.addLine(to: CGPoint(x: c.x + 12, y: c.y + 9))
@@ -84,17 +87,19 @@ enum DisegnoSegni {
                 UIColor.white.setStroke(); p.lineWidth = 2.5; p.fill(); p.stroke()
             case .freccia:
                 if s.rotazione != nil {
+                    // tavola 10: freccia orientata (M0 -10 7 8 0 4 -7 8Z), la ruota il livello della mappa
                     let f = UIBezierPath()
-                    f.move(to: CGPoint(x: c.x, y: c.y - 22)); f.addLine(to: CGPoint(x: c.x + 8, y: c.y - 9))
-                    f.addLine(to: CGPoint(x: c.x - 8, y: c.y - 9)); f.close()
-                    f.lineWidth = 1; f.fill(); f.stroke()
+                    f.move(to: CGPoint(x: c.x, y: c.y - 10)); f.addLine(to: CGPoint(x: c.x + 7, y: c.y + 8))
+                    f.addLine(to: CGPoint(x: c.x, y: c.y + 4)); f.addLine(to: CGPoint(x: c.x - 7, y: c.y + 8)); f.close()
+                    f.lineWidth = 1.2; f.lineJoinStyle = .round; f.fill(); f.stroke()
+                } else {
+                    let p = UIBezierPath(ovalIn: CGRect(x: c.x - 8, y: c.y - 8, width: 16, height: 16))
+                    UIColor.white.setStroke(); p.lineWidth = 2.5; p.fill(); p.stroke()
                 }
-                let p = UIBezierPath(ovalIn: CGRect(x: c.x - 8, y: c.y - 8, width: 16, height: 16))
-                UIColor.white.setStroke(); p.lineWidth = 2.5; p.fill(); p.stroke()
             }
             if !s.glifo.isEmpty {
-                let f = UIFont.monospacedSystemFont(ofSize: s.glifo.count > 2 ? 7 : (s.glifo.count > 1 ? 8 : 10.5), weight: .heavy)
-                let a: [NSAttributedString.Key: Any] = [.font: f, .foregroundColor: UIColor.black]
+                let f = UIFont.monospacedSystemFont(ofSize: s.forma == .rombo ? 7.5 : (s.glifo.count > 2 ? 7 : (s.glifo.count > 1 ? 8 : 10.5)), weight: .heavy)
+                let a: [NSAttributedString.Key: Any] = [.font: f, .foregroundColor: UIColor(white: 0.067, alpha: 1)]
                 let t = (s.glifo as NSString).size(withAttributes: a)
                 (s.glifo as NSString).draw(at: CGPoint(x: c.x - t.width / 2, y: c.y - t.height / 2 + (s.forma == .triangolo ? 3 : 0)), withAttributes: a)
             }
@@ -103,7 +108,8 @@ enum DisegnoSegni {
 
     /// Etichetta come immagine (testo bianco con alone nero): funziona anche offline, senza font scaricati.
     static func etichetta(_ testo: String) -> UIImage {
-        let f = UIFont.systemFont(ofSize: 12, weight: .bold)
+        // tavola 10: 10,5 pt pesante, bianco con alone nero al 70% largo 3 pt
+        let f = UIFont.systemFont(ofSize: 10.5, weight: .heavy)
         let a: [NSAttributedString.Key: Any] = [.font: f, .foregroundColor: UIColor.white]
         let t = (testo as NSString).size(withAttributes: a)
         let size = CGSize(width: ceil(t.width) + 8, height: ceil(t.height) + 6)
@@ -112,7 +118,8 @@ enum DisegnoSegni {
             g.setTextDrawingMode(.stroke)
             g.setLineWidth(3.5)
             g.setLineJoin(.round)
-            let alone: [NSAttributedString.Key: Any] = [.font: f, .foregroundColor: UIColor.black, .strokeColor: UIColor.black, .strokeWidth: 7]
+            let nero = UIColor.black.withAlphaComponent(0.7)
+            let alone: [NSAttributedString.Key: Any] = [.font: f, .foregroundColor: nero, .strokeColor: nero, .strokeWidth: 3 / 10.5 * 100]
             (testo as NSString).draw(at: CGPoint(x: 4, y: 3), withAttributes: alone)
             g.setTextDrawingMode(.fill)
             (testo as NSString).draw(at: CGPoint(x: 4, y: 3), withAttributes: a)
@@ -172,7 +179,7 @@ extension MappaCtl {
             et.predicate = filtro
             et.iconImageName = NSExpression(forKeyPath: "etichetta")
             et.iconAnchor = NSExpression(forConstantValue: "left")
-            et.iconOffset = NSExpression(forConstantValue: NSValue(cgVector: CGVector(dx: 13, dy: 0)))
+            et.iconOffset = NSExpression(forConstantValue: NSValue(cgVector: CGVector(dx: 9, dy: 0)))   // scritta a 13 pt dal centro
             et.iconAllowsOverlap = NSExpression(forConstantValue: false)
             et.symbolSortKey = NSExpression(forKeyPath: "prio")
             st.addLayer(et)

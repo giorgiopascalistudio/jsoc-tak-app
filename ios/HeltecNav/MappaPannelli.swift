@@ -52,7 +52,7 @@ struct PannelloImpostazioni: View {
     var chiudi: () -> Void
     var allinea: (UIImage) -> Void
     var scarica: () -> Void
-    @AppStorage("mappa.coordinate") private var formato = "mgrs"
+    @AppStorage("mappa.coordinate") private var formato = "utm"
     @ObservedObject private var volume = VolumeTasti.shared
     @ObservedObject private var store = EventoStore.shared
     @EnvironmentObject var night: NightMode
@@ -160,7 +160,7 @@ struct PannelloCoordinate: View {
     let iniziale: CLLocationCoordinate2D
     var chiudi: () -> Void
     var usa: (CLLocationCoordinate2D, Bool) -> Void   // (coordinata, crea punto?)
-    @State private var formato = UserDefaults.standard.string(forKey: "mappa.coordinate") ?? "mgrs"
+    @State private var formato = UserDefaults.standard.string(forKey: "mappa.coordinate") ?? "utm"
     // MGRS
     @State private var zona = ""
     @State private var quadrato = ""
@@ -310,7 +310,7 @@ enum Strumento: String, CaseIterable, Identifiable {
     case punto, linea, area, freccia, testo, recinto, simboli
     case chat, video, sos, noveRighe, salute, pacchetti, segnala
     case cifrari, morse, qr, mirino
-    case offline, griglia, importa, immagine, lora
+    case offline, griglia, importa, immagine, lora, livelli
     case cerca, vista360, balistica, replay, cronologia, muroVideo, sms, medico, meteo, rilievo, telecamere, stampa, droni
 
     var id: String { rawValue }
@@ -322,7 +322,7 @@ enum Strumento: String, CaseIterable, Identifiable {
         case .punto, .linea, .area, .freccia, .testo, .recinto, .simboli: return "Disegno"
         case .chat, .video, .sos, .noveRighe, .salute, .pacchetti, .segnala: return "Squadra"
         case .cifrari, .morse, .qr, .mirino: return "Intelligence"
-        case .offline, .griglia, .importa, .immagine, .lora: return "Mappe e rete"
+        case .offline, .griglia, .importa, .immagine, .lora, .livelli: return "Mappe e rete"
         case .cerca: return "Navigazione"
         case .vista360, .balistica: return "Misure"
         case .replay, .cronologia, .muroVideo, .sms, .medico: return "Squadra"
@@ -378,6 +378,7 @@ enum Strumento: String, CaseIterable, Identifiable {
         case .telecamere: return "Telecamere pubbliche"
         case .stampa: return "Stampa PDF"
         case .droni: return "Droni (Remote ID)"
+        case .livelli: return "Livelli"
         }
     }
 
@@ -429,6 +430,7 @@ enum Strumento: String, CaseIterable, Identifiable {
         case .telecamere: return "web.camera.fill"
         case .stampa: return "printer.fill"
         case .droni: return "airplane"
+        case .livelli: return "square.3.layers.3d"
         }
     }
 
