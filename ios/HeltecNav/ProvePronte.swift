@@ -163,11 +163,14 @@ final class SessioneProva: ObservableObject {
     @Published var messaggio: String?
     let durata: Double
     let penalita: Double
+    /// tentativi a disposizione (nil = illimitati): all'ultimo errore la prova è persa
+    let tentativi: Int?
     private(set) var inizio = Date()
 
-    init(minuti: Int, livello: LivelloProva) {
+    init(minuti: Int, livello: LivelloProva, tentativi: Int? = nil, penalitaX: Double = 1) {
         durata = Double(minuti * 60)
-        penalita = livello.penalita
+        penalita = livello.penalita * penalitaX
+        self.tentativi = tentativi
     }
 
     func parti() { inizio = Date(); fine = Date().addingTimeInterval(durata); stato = .incorso; Suoni.ok() }
@@ -180,7 +183,7 @@ final class SessioneProva: ObservableObject {
         fine = fine.addingTimeInterval(-penalita)
         messaggio = "\(m) · −\(Int(penalita)) s"
         Suoni.errore()
-        if restano <= 0 { perdi() }
+        if restano <= 0 || (tentativi.map { errori >= $0 } ?? false) { perdi() }
     }
     func vinci() { guard stato == .incorso else { return }; stato = .vinta; Suoni.ok() }
     func perdi() { guard stato == .incorso else { return }; stato = .persa; Suoni.boom() }
@@ -306,10 +309,12 @@ struct PartitaProva: View {
     @State private var dueTelefoni = false
     private let orologio = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
 
-    init(tipi: [TipoProva], livello: LivelloProva, squadra: String, chiudi: @escaping () -> Void) {
+    /// minuti, tentativi e penalità doppia ("Estrema") scelti nella tavola 66; nil = valori del tipo di prova
+    init(tipi: [TipoProva], livello: LivelloProva, squadra: String, minuti: Int? = nil, tentativi: Int? = nil, estrema: Bool = false,
+         chiudi: @escaping () -> Void) {
         self.tipi = tipi; self.livello = livello; self.squadra = squadra; self.chiudi = chiudi
-        let minuti = tipi.reduce(0) { $0 + $1.minuti(livello) }
-        _s = StateObject(wrappedValue: SessioneProva(minuti: minuti, livello: livello))
+        let minuti = minuti ?? tipi.reduce(0) { $0 + $1.minuti(livello) }
+        _s = StateObject(wrappedValue: SessioneProva(minuti: minuti, livello: livello, tentativi: tentativi, penalitaX: estrema ? 2 : 1))
     }
 
     var tipo: TipoProva { tipi[min(indice, tipi.count - 1)] }
