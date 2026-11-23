@@ -91,7 +91,7 @@ enum DisegnoSegni {
                     let f = UIBezierPath()
                     f.move(to: CGPoint(x: c.x, y: c.y - 10)); f.addLine(to: CGPoint(x: c.x + 7, y: c.y + 8))
                     f.addLine(to: CGPoint(x: c.x, y: c.y + 4)); f.addLine(to: CGPoint(x: c.x - 7, y: c.y + 8)); f.close()
-                    f.lineWidth = 1.2; f.lineJoin = .round; f.fill(); f.stroke()
+                    f.lineWidth = 1.2; f.lineJoinStyle = .round; f.fill(); f.stroke()
                 } else {
                     let p = UIBezierPath(ovalIn: CGRect(x: c.x - 8, y: c.y - 8, width: 16, height: 16))
                     UIColor.white.setStroke(); p.lineWidth = 2.5; p.fill(); p.stroke()
