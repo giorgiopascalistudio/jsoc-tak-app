@@ -329,7 +329,9 @@ struct CoordinateV3: View {
             let pl = try await CLGeocoder().reverseGeocodeLocation(CLLocation(latitude: p.latitude, longitude: p.longitude),
                                                                   preferredLocale: Locale(identifier: "it_IT"))
             guard let f = pl.first, let citta = f.locality ?? f.subAdministrativeArea else { luogo = nil; return }
-            if let pr = f.subAdministrativeArea, pr.count == 2 { luogo = "\(citta) (\(pr))" } else { luogo = citta }
+            // sigla della provincia: dal geocoder se è già di 2 lettere, altrimenti dall'elenco ISTAT dei comuni
+            let sigla = f.subAdministrativeArea.flatMap { $0.count == 2 ? $0 : nil } ?? ComuniIT.trova(citta)?.sigla
+            luogo = sigla.map { "\(citta) (\($0))" } ?? citta
         } catch { luogo = nil }
     }
 }
