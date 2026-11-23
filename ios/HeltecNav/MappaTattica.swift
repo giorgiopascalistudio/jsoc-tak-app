@@ -36,7 +36,7 @@ struct Candidato: Identifiable {
 
 /// Coordinate nel formato scelto nelle impostazioni della mappa.
 func coordTesto(_ c: CLLocationCoordinate2D) -> String {
-    switch UserDefaults.standard.string(forKey: "mappa.coordinate") ?? "mgrs" {
+    switch UserDefaults.standard.string(forKey: "mappa.coordinate") ?? "utm" {
     case "utm": return Coordinate.utmText(c)
     case "dd": return String(format: "%.5f, %.5f", c.latitude, c.longitude)
     case "dms":
@@ -139,12 +139,16 @@ struct MappaTattica: View {
     @AppStorage("mappa.griglia") private var griglia = true
     @AppStorage("mappa.aree") private var mostraAree = true
     @AppStorage("mappa.squadra") private var mostraSquadra = true
+    /// zona di mappa visibile (fuori da colonna e pannello): la Ruota ci deve stare dentro
+    @State private var vistaMappa: CGRect = .zero
 
     var punti: [JPunto] {
+        if Anteprima.mappaAttiva { return Anteprima.puntiMappa }
         let v = store.vistaSquadra
         return (store.corrente?.punti ?? []).filter { v == nil || ($0.squadra ?? "").isEmpty || $0.squadra == v }
     }
     var compagni: [JCompagno] {
+        if Anteprima.mappaAttiva { return mostraSquadra ? Anteprima.compagniMappa : [] }
         let v = store.vistaSquadra
         return mostraSquadra ? store.squadra.filter { $0.id != jsoc.utente?.id && (v == nil || $0.squadra == v) } : []
     }
@@ -162,7 +166,8 @@ struct MappaTattica: View {
             let veraIsola = ins.left >= 30 && !pad
             let colonna: CGFloat = veraIsola ? ins.left : 0
             let isola = land && veraIsola
-            let lBarra: CGFloat = land ? (isola && !barraVisibile ? colonna : 66 + colonna) : 0
+            // tavole 10-12: colonna sempre visibile = informazioni accanto all'isola + 62 pt di pulsanti
+            let lBarra: CGFloat = land ? (isola ? colonna + 62 : 66 + colonna) : 0
             let lPannello: CGFloat = pannello == nil ? 0 : (land ? min(360, (g.size.width - ins.left - ins.right) * 0.42) : 0)
             let hStato: CGFloat = isola ? 0 : 30 + (land && !pad ? 0 : ins.top)
             let hPannelloV: CGFloat = (!land && pannello != nil) ? g.size.height * 0.46 : 0
@@ -174,7 +179,9 @@ struct MappaTattica: View {
             ZStack(alignment: .topLeading) {
                 mappaSotto
 
-                if land {
+                if isola {
+                    interfacciaTela(g.size, ins, colonna: colonna, lPannello: lPannello)
+                } else if land {
                     HStack(spacing: 0) {
                         ZStack(alignment: .leading) {
                             if isola { InfoIsola(spazioIsola: veraIsola).frame(width: colonna) }
@@ -247,8 +254,8 @@ struct MappaTattica: View {
 
                 livelloAlto(vista)
             }
-            .onAppear { ctl.margini(vista, g.size) }
-            .onChange(of: vista) { ctl.margini($0, g.size) }
+            .onAppear { ctl.margini(vista, g.size); vistaMappa = vista }
+            .onChange(of: vista) { ctl.margini($0, g.size); vistaMappa = $0 }
         }
         .ignoresSafeArea()
         .background(Color.black)        .ignoresSafeArea()
@@ -260,11 +267,10 @@ struct MappaTattica: View {
             aggiornaSegni()
             aggiornaDisegni()
             applicaLivelli()
-            if !UserDefaults.standard.bool(forKey: "mappa.rapidi.segnala") {
-                // "Segnala" lascia la colonna laterale (ora c'è Livelli): va nella barra in alto
-                UserDefaults.standard.set(true, forKey: "mappa.rapidi.segnala")
-                let e = BarraRapida.elenco
-                if !e.contains("segnala") { UserDefaults.standard.set((["segnala"] + e).prefix(8).joined(separator: ","), forKey: "mappa.rapidi") }
+            if Anteprima.mappaAttiva {
+                // anteprime sul simulatore: stessa inquadratura delle tavole 10-12 (e Ruota aperta su OBJ 03)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { ctl.vai(Anteprima.centroMappa, zoom: Anteprima.zoomMappa) }
+                if Anteprima.ruotaAperta { DispatchQueue.main.asyncAfter(deadline: .now() + 4) { selezione = .punto(3) } }
             }
             volume.azione = { tastoVolume($0) }
             volume.sos = { avviaSOS() }
@@ -440,15 +446,20 @@ struct MappaTattica: View {
     func livelloAlto(_ vista: CGRect) -> some View {
         ZStack(alignment: .topLeading) {
             if selezione != nil || !scelta.isEmpty {
-                Color.black.opacity(0.18).contentShape(Rectangle()).ignoresSafeArea()
+                // tavola 12: la mappa non si scurisce; un tocco fuori dalla Ruota la chiude
+                Color.clear.contentShape(Rectangle()).ignoresSafeArea()
                     .onTapGesture { withAnimation(.spring(response: 0.3)) { selezione = nil; scelta = [] } }
             }
-            if let s = selezione {
-                MenuRadiale(voci: voci(s), centro: titoloMenu(s), colore: coloreMenu(s), scheda: schedaMenu(s))
+            if let s = selezione, let c = coordSelezione(s) {
+                // la Ruota si apre sul punto, alla stessa scala della mappa (si sposta solo se uscirebbe dalla zona visibile)
+                let _ = ctl.giro
+                let p0 = ctl.punto(c) ?? CGPoint(x: vista.midX, y: vista.midY)
+                let m = MenuRadiale.raggio + 4
+                let p = CGPoint(x: min(max(p0.x, vista.minX + m), max(vista.minX + m, vista.maxX - m)),
+                                y: min(max(p0.y, vista.minY + m), max(vista.minY + m, vista.maxY - m)))
+                MenuRadiale(voci: voci(s), centro: titoloMenu(s), colore: coloreMenu(s), posizione: p)
                     .id(s)   // toccando un altro punto il ventaglio riparte
                     .transition(.identity)
-                    .frame(width: vista.width, height: vista.height)
-                    .offset(x: vista.minX, y: vista.minY)
             }
             if !scelta.isEmpty { sceltaVicini }
             if let m = mira { CroceMira(punto: m, testo: ctl.coordinata(m).map { coordTesto($0) } ?? "").allowsHitTesting(false) }
@@ -674,6 +685,124 @@ struct MappaTattica: View {
         .transition(.opacity)
     }
 
+    // MARK: tavole 10-12 (iPhone in orizzontale)
+
+    /// Colonna a sinistra (informazioni accanto all'isola + pulsanti), velata sopra la mappa, pannello e comandi.
+    func interfacciaTela(_ s: CGSize, _ ins: UIEdgeInsets, colonna: CGFloat, lPannello: CGFloat) -> some View {
+        let lati = colonna + 62
+        return ZStack(alignment: .topLeading) {
+            ZStack(alignment: .topLeading) {
+                InfoIsola(spazioIsola: true).frame(width: colonna, height: s.height)
+                ColonnaTela(attivo: pannello, notte: night.on, azione: barra)
+                    .frame(width: 62, height: s.height)
+                    .offset(x: colonna)
+            }
+            .frame(width: lati, height: s.height, alignment: .topLeading)
+            .background(Color(red: 6 / 255, green: 8 / 255, blue: 5 / 255).opacity(0.72))
+            .overlay(alignment: .trailing) { Rectangle().fill(Theme.olive.opacity(0.22)).frame(width: 1) }
+            if let p = pannello {
+                pannelloVista(p).padding(.bottom, ins.bottom)
+                    .frame(width: lPannello, height: s.height)
+                    .background(vetroPannello)
+                    .offset(x: lati)
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+            }
+            comandiTela(s, sinistra: lati + lPannello)
+        }
+        .frame(width: s.width, height: s.height, alignment: .topLeading)
+    }
+
+    /// Comandi sulla mappa come nella tavola 10: strumenti scelti in alto al centro, Nord e 2D/3D in alto a destra,
+    /// scala e coordinate in basso al centro, "segui la mia posizione" in basso a destra.
+    func comandiTela(_ s: CGSize, sinistra: CGFloat) -> some View {
+        let destra = s.width - 39                       // asse dei tasti tondi a destra
+        let cx = (sinistra + s.width - 61) / 2          // centro tra la colonna e i tasti a destra
+        let libero = ctl.modo == .none
+        return ZStack(alignment: .topLeading) {
+            if s.width - sinistra - 61 >= 450 {
+                BarraRapida(usa: strumento) {
+                    pannello = .strumenti
+                    mostra("Tieni premuto uno strumento per metterlo in alto")
+                }
+                .position(x: cx, y: 8 + 19.5)
+            }
+            if let v = store.vistaSquadra {
+                // organizzatore: mappa di una sola squadra
+                Button { haptic(); store.vistaSquadra = nil; aggiornaSegni(); aggiornaDisegni() } label: {
+                    HStack(spacing: 5) {
+                        Text("MAPPA " + v.uppercased()).font(Theme.mono(11, .heavy))
+                        Image(systemName: "xmark.circle.fill")
+                    }
+                    .foregroundStyle(v == "attacco" ? Theme.red : Theme.cyan)
+                    .padding(.horizontal, 10).frame(height: 30)
+                    .background(Color.black.opacity(0.7), in: Capsule())
+                }
+                .accessibilityLabel("Torna alla mappa di tutte le squadre")
+                .position(x: cx, y: 70)
+            }
+            if let a = avviso {
+                Text(a).font(.system(size: 12, weight: .heavy)).foregroundStyle(.white)
+                    .padding(.horizontal, 12).padding(.vertical, 7)
+                    .background(Color.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 11))
+                    .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(olivaChiaro.opacity(0.55)))
+                    .frame(maxWidth: max(160, s.width - sinistra - 140))
+                    .position(x: cx, y: store.vistaSquadra == nil ? 74 : 108)
+                    .transition(.opacity)
+            }
+            // Nord in alto (ruota con la mappa) e vista 2D/3D
+            Button { haptic(); ctl.nordInAlto() } label: {
+                IconaTela(d: Ic.mNord, colore: Theme.red, lato: 22)
+                    .rotationEffect(.degrees(-ctl.rotazione))
+                    .frame(width: 44, height: 44).background(Theme.bg, in: Circle())
+            }
+            .accessibilityLabel("Nord in alto")
+            .position(x: destra, y: 19 + 22)
+            Button { haptic(); ctl.cambiaTreD() } label: {
+                Text(ctl.tre_d ? "3D" : "2D").font(Theme.mono(13, .heavy)).foregroundStyle(oliva)
+                    .frame(width: 34, height: 34).background(Theme.bg, in: Circle())
+            }
+            .accessibilityLabel("Vista 2D/3D")
+            .position(x: destra, y: 72 + 17)
+            if let o = ctl.offline {
+                ProgressView(value: Double(o.fatti), total: Double(o.totale)) {
+                    Text("Scarico la zona: \(o.fatti)/\(o.totale)").font(Theme.mono(10, .bold))
+                }
+                .tint(oliva).padding(8).frame(width: min(300, s.width - sinistra - 140))
+                .background(Color.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 10))
+                .position(x: cx, y: s.height - 72)
+            }
+            // scala a sinistra del centro, coordinate a destra del centro
+            HStack(alignment: .top, spacing: 0) {
+                ScalaMappa(metriPerPunto: ctl.metriPerPunto)
+                    .padding(.trailing, 14)
+                    .frame(width: 220, alignment: .trailing)
+                Text(location.location.map { coordTesto($0.coordinate) } ?? "in attesa del GPS")
+                    .font(Theme.mono(11, .heavy)).foregroundStyle(Theme.testo)
+                    .shadow(color: .black.opacity(0.6), radius: 2)
+                    .lineLimit(1).minimumScaleFactor(0.7)
+                    .frame(width: 220, alignment: .leading)
+            }
+            .frame(height: 24, alignment: .top)
+            .allowsHitTesting(false)
+            .position(x: cx, y: s.height - 36 + 12)
+            // segui la mia posizione: libera → segue → segue orientata
+            Button {
+                haptic(.medium); ctl.cicloModo()
+                mostra(ctl.modo == .follow ? "Ti seguo · nord in alto" : (ctl.modo == .followWithHeading ? "Ti seguo · orientata sulla tua direzione" : "Mappa libera"))
+            } label: {
+                IconaTela(d: Ic.mSegui, colore: libero ? Theme.testo : Theme.scuro, lato: 26,
+                          piena: ctl.modo == .followWithHeading ? Theme.scuro : nil)
+                    .frame(width: 43, height: 43)
+                    .background(libero ? Color.clear : olivaChiaro, in: Circle())
+                    .overlay(Circle().strokeBorder(Theme.testo, lineWidth: 2).opacity(libero ? 1 : 0))
+            }
+            .accessibilityLabel("Segui la mia posizione")
+            .position(x: destra + 1.5, y: s.height - 22 - 21.5)
+        }
+        .frame(width: s.width, height: s.height, alignment: .topLeading)
+        .animation(.spring(response: 0.3), value: avviso)
+    }
+
     // MARK: comandi sopra la parte visibile della mappa
 
     func comandiMappa(_ bordi: EdgeInsets) -> some View {
@@ -836,78 +965,69 @@ struct MappaTattica: View {
 
     func seleziona(_ s: SelezioneMappa, _ c: CLLocationCoordinate2D) {
         haptic(.medium)
-        ctl.vai(c, zoom: max(ctl.zoom, 15))
+        // la mappa resta dov'è (tavola 12): si sposta solo se la Ruota non ci starebbe intorno al punto
+        let m = MenuRadiale.raggio + 4
+        if let p = ctl.punto(c), vistaMappa.width > 2 * m, !vistaMappa.insetBy(dx: m, dy: min(m, vistaMappa.height / 2 - 1)).contains(p) {
+            ctl.vai(c, zoom: ctl.zoom)
+        }
         withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) { selezione = s }
+    }
+
+    func coordSelezione(_ s: SelezioneMappa) -> CLLocationCoordinate2D? {
+        switch s {
+        case .punto(let id): return punti.first { $0.id == id }?.coordinate
+        case .compagno(let id): return (compagni.first { $0.id == id } ?? store.squadra.first { $0.id == id })?.coordinate
+        }
     }
 
     func titoloMenu(_ s: SelezioneMappa) -> String {
         switch s {
         case .punto(let id): return punti.first { $0.id == id }.map { numeroObj($0) ?? String($0.nome.prefix(3)) } ?? "?"
-        case .compagno(let id): return store.squadra.first { $0.id == id }?.callsign ?? "?"
+        case .compagno(let id): return (compagni.first { $0.id == id } ?? store.squadra.first { $0.id == id })?.callsign ?? "?"
         }
     }
 
     func coloreMenu(_ s: SelezioneMappa) -> Color {
-        if case .compagno = s { return Theme.cyan }
-        return Theme.red
-    }
-
-    func schedaMenu(_ s: SelezioneMappa) -> AnyView {
-        let me = location.location?.coordinate
         switch s {
-        case .punto(let id):
-            guard let p = punti.first(where: { $0.id == id }) else { return AnyView(EmptyView()) }
-            return AnyView(SchedaBreve(titolo: p.nome, etichetta: p.fatto ? "FATTO" : (p.obiettivo ? "DA FARE" : p.tipo.uppercased()),
-                                       coloreEtichetta: p.fatto ? Theme.green : Theme.amber, me: me, c: p.coordinate,
-                                       riga: "\((p.indagine ?? []).count) note · \(allegati(p).count) allegati"))
-        case .compagno(let id):
-            guard let c = store.squadra.first(where: { $0.id == id }) else { return AnyView(EmptyView()) }
-            return AnyView(SchedaBreve(titolo: c.callsign, etichetta: c.eta < 300 ? "ATTIVO" : "\(Int(c.eta / 60))′ FA",
-                                       coloreEtichetta: c.eta < 300 ? Theme.green : Theme.amber, me: me, c: c.coordinate,
-                                       riga: [c.nome ?? "", c.batt.map { "batteria \(Int($0 * 100))%" } ?? ""].filter { !$0.isEmpty }.joined(separator: " · ")))
+        case .compagno: return Theme.cyan
+        case .punto(let id): return punti.first { $0.id == id }.map { SegnapostoPunto(punto: $0).colore } ?? Theme.red
         }
     }
 
+    /// Spicchi della Ruota (tavola 12), in senso orario da ore 12.
     func voci(_ s: SelezioneMappa) -> [VoceRadiale] {
         switch s {
         case .punto(let id):
             guard let p = punti.first(where: { $0.id == id }) else { return [] }
             let gp = GaraPoint(id: p.nome, lat: p.lat, lon: p.lon, kind: DatiEvento.kind(p.tipo), note: p.note ?? "")
             return [
-                VoceRadiale(icona: "doc.text.fill", testo: "Resoconto", colore: olivaChiaro) { apri(.resoconto(id)) },
-                VoceRadiale(icona: "location.north.line.fill", testo: "Naviga", colore: oliva) { nav.target = gp; selezione = nil },
-                VoceRadiale(icona: "square.and.arrow.up", testo: "Condividi", colore: oliva) { selezione = nil; condividiPunto(nome: p.nome, p.coordinate) },
-                VoceRadiale(icona: "figure.walk.motion", testo: "Vicini", colore: Theme.cyan) { apri(.piuVicini(id)) },
-                VoceRadiale(icona: "ruler", testo: "Misura", colore: oliva) {
-                    misura = [location.location?.coordinate, p.coordinate].compactMap { $0 }; apri(.misura)
-                },
-                VoceRadiale(icona: p.fatto ? "arrow.uturn.backward" : "checkmark", testo: p.fatto ? "Riapri" : "Fatto", colore: Theme.green) {
-                    Task { _ = try? await jsoc.aggiornaPunto(id, ["stato": p.fatto ? "da fare" : "fatto"]); await store.aggiorna(jsoc) }
-                    selezione = nil
-                },
-                VoceRadiale(icona: "bubble.left.fill", testo: "In chat", colore: oliva) {
+                VoceRadiale(icona: Ic.mNaviga, testo: "Naviga", colore: oliva) { nav.target = gp; selezione = nil },
+                VoceRadiale(icona: Ic.mResoconto, testo: "Resoconto", colore: oliva) { apri(.resoconto(id)) },
+                VoceRadiale(icona: Ic.mVideo, testo: "Video", colore: Theme.cyan) { apri(.video(nil)) },
+                VoceRadiale(icona: Ic.mMessaggi, testo: "Chat", colore: oliva) {
                     Task { try? await store.scrivi("📍 \(p.nome) · \(Geo.mgrs(p.coordinate))", jsoc, posizione: p.coordinate) }
                     apri(.chat(nil))
                 },
-                VoceRadiale(icona: "trash.fill", testo: "Elimina", colore: Theme.red) {
+                VoceRadiale(icona: Ic.mCondividi, testo: "Condividi", colore: oliva) { selezione = nil; condividiPunto(nome: p.nome, p.coordinate) },
+                VoceRadiale(icona: Ic.mElimina, testo: "Elimina", colore: Theme.red, rosso: true) {
                     selezione = nil
                     daEliminare = p
                 },
             ]
         case .compagno(let id):
-            guard let c = store.squadra.first(where: { $0.id == id }) else { return [] }
+            guard let c = compagni.first(where: { $0.id == id }) ?? store.squadra.first(where: { $0.id == id }) else { return [] }
             return [
-                VoceRadiale(icona: "location.north.line.fill", testo: "Naviga", colore: olivaChiaro) {
+                VoceRadiale(icona: Ic.mNaviga, testo: "Naviga", colore: oliva) {
                     nav.target = GaraPoint(id: c.callsign, lat: c.lat, lon: c.lon, kind: .recon, note: "Posizione di \(c.callsign)")
                     selezione = nil
                 },
-                VoceRadiale(icona: "bubble.left.fill", testo: "Chat", colore: oliva) { apri(.chat(id)) },
-                VoceRadiale(icona: "video.fill", testo: "Video", colore: Theme.red) { apri(.video(c.callsign)) },
-                VoceRadiale(icona: "ruler", testo: "Misura", colore: oliva) {
+                VoceRadiale(icona: Ic.mInfo, testo: "Info", colore: oliva) { apri(.info(id)) },
+                VoceRadiale(icona: Ic.mVideo, testo: "Video", colore: Theme.cyan) { apri(.video(c.callsign)) },
+                VoceRadiale(icona: Ic.mMessaggi, testo: "Chat", colore: oliva) { apri(.chat(id)) },
+                VoceRadiale(icona: Ic.mMisura, testo: "Misura", colore: oliva) {
                     misura = [location.location?.coordinate, c.coordinate].compactMap { $0 }; apri(.misura)
                 },
-                VoceRadiale(icona: "info.circle", testo: "Info", colore: oliva) { apri(.info(id)) },
-                VoceRadiale(icona: "scope", testo: "Centra", colore: oliva) { ctl.vai(c.coordinate); selezione = nil },
+                VoceRadiale(icona: Ic.mCentra, testo: "Centra", colore: oliva) { ctl.vai(c.coordinate); selezione = nil },
             ]
         }
     }
@@ -1064,6 +1184,7 @@ struct MappaTattica: View {
         case .medico: pannello = .medico
         case .balistica: pannello = .balistica
         case .droni: pannello = .droni
+        case .livelli: pannello = .livelli
         case .sms:
             if MFMessageComposeViewController.canSendText(), let c = location.location?.coordinate {
                 sms = "JSOC \(jsoc.utente?.callsign ?? "") \(Geo.mgrs(c)) \(Date().formatted(date: .omitted, time: .shortened)) https://maps.apple.com/?ll=\(c.latitude),\(c.longitude)"
@@ -1119,7 +1240,10 @@ struct MappaTattica: View {
             switch p {
             case .resoconto(let id):
                 if let x = punti.first(where: { $0.id == id }) {
-                    PannelloResoconto(punto: x, allegati: allegati(x), chiudi: chiudi)
+                    // Fatto, Più vicini e Misura erano spicchi della vecchia Ruota: ora stanno nel resoconto
+                    PannelloResoconto(punto: x, allegati: allegati(x), chiudi: chiudi,
+                                      vicini: { pannello = .piuVicini(id) },
+                                      misura: { misura = [location.location?.coordinate, x.coordinate].compactMap { $0 }; pannello = .misura })
                 } else { PannelloVuoto(titolo: "Punto non trovato", chiudi: chiudi) }
             case .video(let nome): PannelloVideo(scelto: nome, chiudi: chiudi)
             case .naviga:
@@ -1216,7 +1340,7 @@ struct BarraStrumenti: View {
             voce(.strumenti, "square.grid.2x2.fill", "Strumenti", on: attivo == .strumenti, colore: Theme.oliveBright)
             if verticale { Rectangle().fill(Theme.stroke).frame(width: 32, height: 1).padding(.vertical, 2) }
             // solo quello che serve subito sul campo; il resto è in Strumenti
-            voce(.livelli, "square.3.layers.3d", "Livelli", on: attivo == .livelli, colore: Theme.amber)
+            voce(.segnala, "exclamationmark.triangle", "Segnala", on: attivo == .segnala, colore: Theme.amber)
             voce(.squadra, "person.2.fill", "Squadra", on: attivo == .squadra, colore: Theme.cyan)
             voce(.messaggi, "bubble.left.and.bubble.right.fill", "Messaggi", on: chatAperta)
             voce(.video, tx.stato == .open ? "dot.radiowaves.left.and.right" : "video.fill", tx.stato == .open ? "IN ONDA" : "Video",
@@ -1274,7 +1398,7 @@ struct SegnapostoPunto: View {
     var colore: Color {
         if punto.fatto { return Color(white: 0.45) }
         switch punto.tipo {
-        case "obj", "obiettivo": return Theme.red
+        case "obj", "obiettivo": return Color(hex: 0xE5533F)   // rosso degli OBJ nelle tavole
         case "pericolo": return Theme.amber
         case "acqua": return Color(red: 0.3, green: 0.55, blue: 1)
         case "raduno", "base", "hotel", "parcheggio": return Theme.cyan
@@ -1543,12 +1667,15 @@ struct ScalaMappa: View {
         let target = metriPerPunto * 80
         let passi: [Double] = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000]
         let m = passi.last { $0 <= target } ?? 10
-        VStack(alignment: .leading, spacing: 2) {
-            Rectangle().fill(.clear).frame(width: max(10, m / metriPerPunto), height: 6)
-                .overlay(alignment: .bottom) { Rectangle().fill(.white).frame(height: 2) }
-                .overlay(alignment: .leading) { Rectangle().fill(.white).frame(width: 2) }
-                .overlay(alignment: .trailing) { Rectangle().fill(.white).frame(width: 2) }
-            Text(m >= 1000 ? "\(Int(m / 1000)) km" : "\(Int(m)) m").font(Theme.mono(10, .heavy)).foregroundStyle(.white).shadow(color: .black, radius: 2)
+        // tavola 10: staffa bianca da 1,5 pt (senza lato in alto), sotto la distanza
+        VStack(alignment: .leading, spacing: 0) {
+            Rectangle().fill(.clear).frame(width: max(10, m / metriPerPunto), height: 7.5)
+                .overlay(alignment: .bottom) { Rectangle().fill(Theme.testo).frame(height: 1.5) }
+                .overlay(alignment: .leading) { Rectangle().fill(Theme.testo).frame(width: 1.5) }
+                .overlay(alignment: .trailing) { Rectangle().fill(Theme.testo).frame(width: 1.5) }
+                .shadow(color: .black.opacity(0.5), radius: 1.5)
+            Text(m >= 1000 ? "\(Int(m / 1000)) km" : "\(Int(m)) m").font(Theme.mono(10, .heavy)).foregroundStyle(Theme.testo)
+                .shadow(color: .black.opacity(0.6), radius: 2)
         }
     }
 }
@@ -1557,54 +1684,63 @@ struct ScalaMappa: View {
 
 struct VoceRadiale: Identifiable {
     let id = UUID()
+    /// percorso SVG della tela (Ic.m…)
     let icona: String
     let testo: String
     let colore: Color
+    /// spicchio rosso scuro (Elimina)
+    var rosso = false
     let azione: () -> Void
 }
 
-/// LA RUOTA: menu circolare su obiettivi e operatori. Si apre a ventaglio dal centro, trasparente sulla mappa.
+/// LA RUOTA (tavola 12): menu circolare su obiettivi e operatori, centrato sul punto toccato.
+/// Si apre a ventaglio dal centro, velata sulla mappa. Misure della tela (r 104/38, centro 31) ingrandite di 1,15.
 struct MenuRadiale: View {
     let voci: [VoceRadiale]
     let centro: String
     let colore: Color
-    let scheda: AnyView
-    private let r: CGFloat = 104          // raggio esterno degli spicchi
-    private let ri: CGFloat = 37          // raggio interno (attorno al pallino centrale)
+    /// centro della Ruota nello schermo
+    let posizione: CGPoint
+    static let scala: CGFloat = 1.15
+    static let raggio: CGFloat = 104 * scala
+    private let r: CGFloat = MenuRadiale.raggio          // raggio esterno degli spicchi
+    private let ri: CGFloat = 38 * MenuRadiale.scala     // raggio interno (attorno al pallino centrale)
+    /// tavola 11 (non ancora approvata): spicchi separati da fessure a lati paralleli
+    @AppStorage("mappa.spicchiParalleli") private var paralleli = false
     /// apertura disegnata fotogramma per fotogramma: gli spicchi escono uno dopo l'altro ruotando da ore 12
     @State private var inizio = Date()
     @State private var finito = false
     private let durata = 0.34, scalino = 0.05
 
     var body: some View {
-        GeometryReader { g in
-            let c = CGPoint(x: g.size.width / 2, y: g.size.height / 2)
-            let ampiezza = 360.0 / Double(max(voci.count, 1))
-            TimelineView(.animation(minimumInterval: nil, paused: finito)) { tl in
-                let t = finito ? 10 : tl.date.timeIntervalSince(inizio)
-                ZStack {
-                    ForEach(Array(voci.enumerated()), id: \.element.id) { i, v in
-                        let k = Self.molla((t - scalino * Double(i)) / durata)
-                        let da = -90 - ampiezza / 2 + Double(i) * ampiezza + 1.6
-                        SpicchioRuota(voce: v, da: da, a: da + ampiezza - 3.2, ri: ri, ro: r, centro: c)
-                            .rotationEffect(.degrees(-50 * (1 - min(k, 1))))
-                            .scaleEffect(0.5 + 0.5 * k)
-                            .opacity(min(1, k * 2.5))
-                    }
-                    let f = Self.morbido(t / 0.2)
-                    Text(centro).font(Theme.mono(14, .heavy)).foregroundStyle(.black)
-                        .lineLimit(1).minimumScaleFactor(0.6).padding(4)
-                        .frame(width: 62, height: 62)
-                        .background(colore, in: Circle())
-                        .overlay(Circle().stroke(.white, lineWidth: 3))
-                        .shadow(color: .black.opacity(0.5), radius: 6)
-                        .scaleEffect(0.5 + 0.5 * f).opacity(f)
-                        .position(c)
-                    scheda.frame(width: 230).position(posizioneScheda(c, g.size.width))
-                        .opacity(Self.morbido((t - 0.2) / 0.22))
+        // disegnata in un riquadro proprio, così il ventaglio ruota attorno al centro della Ruota
+        let lato = 2 * (r + 6)
+        let c = CGPoint(x: lato / 2, y: lato / 2)
+        let k = Self.scala
+        let ampiezza = 360.0 / Double(max(voci.count, 1))
+        TimelineView(.animation(minimumInterval: nil, paused: finito)) { tl in
+            let t = finito ? 10 : tl.date.timeIntervalSince(inizio)
+            ZStack {
+                ForEach(Array(voci.enumerated()), id: \.element.id) { i, v in
+                    let q = Self.molla((t - scalino * Double(i)) / durata)
+                    SpicchioRuota(voce: v, medio: -90 + Double(i) * ampiezza, ampiezza: ampiezza, ri: ri, ro: r, centro: c, paralleli: paralleli)
+                        .rotationEffect(.degrees(-50 * (1 - min(q, 1))))
+                        .scaleEffect(0.5 + 0.5 * q)
+                        .opacity(min(1, q * 2.5))
                 }
+                let f = Self.morbido(t / 0.2)
+                Text(centro).font(Theme.mono(15 * k, .heavy)).foregroundStyle(Color(hex: 0x111111))
+                    .lineLimit(1).minimumScaleFactor(0.5).padding(5)
+                    .frame(width: 62 * k, height: 62 * k)
+                    .background(colore, in: Circle())
+                    .overlay(Circle().stroke(.white, lineWidth: 3 * k))
+                    .scaleEffect(0.5 + 0.5 * f).opacity(f)
+                    .position(c)
             }
+            .frame(width: lato, height: lato)
         }
+        .frame(width: lato, height: lato)
+        .position(posizione)
         .onAppear {
             inizio = Date(); finito = false
             haptic(.light)
@@ -1621,12 +1757,6 @@ struct MenuRadiale: View {
         let c1 = 1.4, c3 = c1 + 1
         return 1 + c3 * pow(v - 1, 3) + c1 * pow(v - 1, 2)
     }
-
-    func posizioneScheda(_ c: CGPoint, _ larghezza: CGFloat) -> CGPoint {
-        let distanza: CGFloat = r + 22 + 135
-        if larghezza - c.x > 290 { return CGPoint(x: c.x + distanza, y: c.y) }
-        return CGPoint(x: max(125, c.x - distanza), y: c.y)
-    }
 }
 
 struct BottoneRadiale: View {
@@ -1634,7 +1764,7 @@ struct BottoneRadiale: View {
     var body: some View {
         Button { haptic(.medium); voce.azione() } label: {
             VStack(spacing: 2) {
-                Image(systemName: voce.icona).font(.system(size: 17, weight: .bold)).foregroundStyle(voce.colore)
+                IconaTela(d: voce.icona, colore: voce.colore, lato: 18)
                 Text(voce.testo).font(.system(size: 9, weight: .bold)).foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.7)
             }
             .frame(width: 56, height: 56)
@@ -1726,6 +1856,8 @@ struct PannelloResoconto: View {
     let punto: JPunto
     let allegati: [DocItem]
     var chiudi: () -> Void
+    var vicini: (() -> Void)? = nil
+    var misura: (() -> Void)? = nil
     @EnvironmentObject var location: LocationService
     @EnvironmentObject var docs: DocStore
     @ObservedObject private var store = EventoStore.shared
@@ -1753,6 +1885,13 @@ struct PannelloResoconto: View {
                             .background((punto.fatto ? Theme.green : Theme.amber).opacity(0.15), in: RoundedRectangle(cornerRadius: 6))
                         Text(punto.tipo.uppercased()).font(Theme.mono(9.5, .heavy)).foregroundStyle(Theme.dim)
                         Spacer()
+                        Button(punto.fatto ? "Riapri" : "Fatto") {
+                            haptic(.medium)
+                            Task { _ = try? await JsocClient.shared.aggiornaPunto(punto.id, ["stato": punto.fatto ? "da fare" : "fatto"]); await store.aggiorna(JsocClient.shared) }
+                        }
+                        .font(.caption.weight(.bold)).tint(Theme.green)
+                        if let vicini { Button("Vicini", action: vicini).font(.caption.weight(.bold)).tint(Theme.cyan) }
+                        if let misura { Button("Misura", action: misura).font(.caption.weight(.bold)).tint(Theme.olive) }
                         if store.corrente?.staff == true {
                             Button(modificaResoconto ? "Salva" : "Modifica") {
                                 if modificaResoconto {
@@ -2308,142 +2447,233 @@ struct Spicchio: Shape {
 
 
 /// Uno spicchio della Ruota: settore di corona circolare con icona e nome, si tocca solo dentro la sua forma.
+/// Icona e nome stanno a 70 pt (×1,15) dal centro, sull'asse dello spicchio; il nome va su due righe
+/// o si rimpicciolisce invece di essere tagliato.
 struct SpicchioRuota: View {
     let voce: VoceRadiale
-    let da: Double
-    let a: Double
+    /// asse dello spicchio in gradi (0 = destra, -90 = ore 12)
+    let medio: Double
+    let ampiezza: Double
     let ri: CGFloat
     let ro: CGFloat
     let centro: CGPoint
+    var paralleli = false
 
     var body: some View {
-        let forma = SettoreAnello(da: da, a: a, ri: ri, ro: ro, centro: centro)
-        let m = (da + a) / 2 * .pi / 180
-        let rm = (ri + ro) / 2 + 3
-        let p = CGPoint(x: centro.x + rm * CGFloat(cos(m)), y: centro.y + rm * CGFloat(sin(m)))
-        let rosso = voce.testo == "Elimina"
+        let k = MenuRadiale.scala
+        let forma = SettoreAnello(da: medio - ampiezza / 2, a: medio + ampiezza / 2, ri: ri, ro: ro, centro: centro,
+                                  taglio: paralleli ? 4 * k : nil)
+        let m = medio * .pi / 180
+        let rb = 70 * k
+        let b = CGPoint(x: centro.x + rb * CGFloat(cos(m)), y: centro.y + rb * CGFloat(sin(m)))
+        // spazio per il nome: corda dello spicchio all'altezza della scritta, meno un margine
+        let larghezza = max(40, 2 * (rb + 9 * k) * CGFloat(sin(ampiezza / 2 * .pi / 180)) - 10 * k)
         Button { haptic(.medium); voce.azione() } label: {
             ZStack {
-                forma.fill(rosso ? Color(red: 0.32, green: 0.08, blue: 0.06).opacity(0.86) : Color(red: 0.04, green: 0.05, blue: 0.03).opacity(0.84))
-                forma.stroke(voce.colore.opacity(0.6), lineWidth: 1.2)
-                VStack(spacing: 2) {
-                    Image(systemName: voce.icona).font(.system(size: 17, weight: .bold)).foregroundStyle(voce.colore)
-                    Text(voce.testo).font(.system(size: 9.5, weight: .bold)).foregroundStyle(.white)
-                        .lineLimit(1).minimumScaleFactor(0.7)
-                }
-                .frame(width: 62)
-                .position(p)
+                forma.fill(voce.rosso ? Color(red: 80 / 255, green: 22 / 255, blue: 16 / 255).opacity(0.82)
+                                      : Color(red: 10 / 255, green: 12 / 255, blue: 8 / 255).opacity(0.80))
+                forma.stroke(voce.colore.opacity(0.55), lineWidth: 1.2 * k)
+                IconaTela(d: voce.icona, colore: voce.colore, lato: 18 * k, spessore: 2.2)
+                    .position(x: b.x, y: b.y - 9.35 * k)
+                Text(voce.testo).font(.system(size: 9.5 * k, weight: .bold)).foregroundStyle(Theme.testo)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2).minimumScaleFactor(0.6)
+                    .frame(width: larghezza)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .position(x: b.x, y: b.y + 9.35 * k)
             }
             .contentShape(forma)
         }
         .buttonStyle(PressStyle())
+        .accessibilityLabel(voce.testo)
     }
 }
 
+/// Settore di corona circolare. Fessure tra gli spicchi: 1,5° per lato (tavola 12) oppure,
+/// con `taglio`, a lati paralleli distanti `taglio` dall'asse della fessura (tavola 11).
 struct SettoreAnello: Shape {
     let da: Double
     let a: Double
     let ri: CGFloat
     let ro: CGFloat
     let centro: CGPoint
+    var taglio: CGFloat? = nil
+    var gradi: Double = 1.5
 
     func path(in rect: CGRect) -> Path {
+        func g(_ r: CGFloat) -> Double {
+            guard let t = taglio, r > 0 else { return gradi }
+            return asin(Double(min(t / r, 0.95))) * 180 / .pi
+        }
         var p = Path()
-        p.addArc(center: centro, radius: ro, startAngle: .degrees(da), endAngle: .degrees(a), clockwise: false)
-        p.addArc(center: centro, radius: ri, startAngle: .degrees(a), endAngle: .degrees(da), clockwise: true)
+        p.addArc(center: centro, radius: ro, startAngle: .degrees(da + g(ro)), endAngle: .degrees(a - g(ro)), clockwise: false)
+        p.addArc(center: centro, radius: ri, startAngle: .degrees(a - g(ri)), endAngle: .degrees(da + g(ri)), clockwise: true)
         p.closeSubpath()
         return p
     }
 }
 
-/// Colonna accanto all'isola dinamica: ora e collegamento sopra, direzione/quota/GPS sotto.
+/// Colonna accanto all'isola dinamica (tavola 10): ora e collegamento sopra l'isola, GPS, direzione e quota sotto.
 struct InfoIsola: View {
     var spazioIsola = true
     @EnvironmentObject var location: LocationService
     @ObservedObject private var jsoc = JsocClient.shared
     @ObservedObject private var traccia = Traccia.shared
+    private static let ora: DateFormatter = { let f = DateFormatter(); f.dateFormat = "H:mm"; return f }()
 
     var body: some View {
         let l = location.location
-        VStack(spacing: 0) {
-            VStack(spacing: 4) {
-                Spacer(minLength: 0)
-                Batteria()
+        let prova = Anteprima.mappaAttiva
+        GeometryReader { g in
+            let cx = g.size.width / 2, cy = g.size.height / 2
+            ZStack {
                 TimelineView(.periodic(from: .now, by: 30)) { ctx in
-                    Text(ctx.date.formatted(date: .omitted, time: .shortened)).font(Theme.mono(12, .heavy)).foregroundStyle(.white)
+                    Text(Self.ora.string(from: ctx.date)).font(Theme.mono(11, .heavy)).foregroundStyle(Theme.testo)
                 }
-                HStack(spacing: 3) {
-                    Circle().fill(jsoc.online ? Theme.green : Theme.amber).frame(width: 6, height: 6)
-                    Text(jsoc.online ? "ONLINE" : "OFFLINE")
+                .position(x: cx, y: cy - 160)
+                HStack(spacing: 5) {
+                    Circle().fill(jsoc.online ? Theme.green : Theme.amber).frame(width: 7, height: 7)
+                    Text(jsoc.online ? "ONLINE" : "OFFLINE").font(Theme.mono(9.5, .bold))
+                        .foregroundStyle(jsoc.online ? Color(hex: 0x8FD18A) : Theme.amber)
                 }
-                .font(Theme.mono(8.5, .heavy)).foregroundStyle(jsoc.online ? Theme.green : Theme.amber)
-                if traccia.attiva { Text("● REC").font(Theme.mono(8.5, .heavy)).foregroundStyle(Theme.red) }
-            }
-            .padding(.bottom, 8)
-            .frame(maxHeight: .infinity)
-            Color.clear.frame(height: spazioIsola ? 132 : 24)      // l'isola (sull'iPad solo un respiro)
-            VStack(spacing: 4) {
+                .position(x: cx, y: cy - 142)
+                if traccia.attiva {
+                    Text("● REC").font(Theme.mono(9.5, .heavy)).foregroundStyle(Theme.red).position(x: cx, y: cy - 126)
+                }
+                if let l, l.horizontalAccuracy >= 0 {
+                    Text(String(format: "GPS ±%.0f", l.horizontalAccuracy))
+                        .foregroundStyle(l.horizontalAccuracy <= 10 ? Theme.dim : Theme.amber)
+                        .position(x: cx, y: cy + 85)
+                } else if prova {
+                    Text("GPS ±6").foregroundStyle(Theme.dim).position(x: cx, y: cy + 85)
+                }
                 if let h = location.heading {
-                    Text("\(gradi3(h - (location.declinazione ?? 4.6))) \(Mission.cardinale(h))").foregroundStyle(Theme.oliveBright)
+                    Text("\(gradi3(h - (location.declinazione ?? 4.6))) \(Mission.cardinale(h))").foregroundStyle(Theme.olive)
+                        .position(x: cx, y: cy + 107)
+                } else if prova {
+                    Text("058° NE").foregroundStyle(Theme.olive).position(x: cx, y: cy + 107)
                 }
-                if let l, l.verticalAccuracy > 0 { Text(String(format: "%.0f m", l.altitude)).foregroundStyle(Theme.dim) }
-                if let l {
-                    Text(String(format: "GPS ±%.0f", l.horizontalAccuracy)).foregroundStyle(l.horizontalAccuracy <= 10 ? Theme.dim : Theme.amber)
+                if let l, l.verticalAccuracy > 0, !prova {
+                    Text(String(format: "%.0f m", l.altitude)).foregroundStyle(Theme.dim).position(x: cx, y: cy + 128)
+                } else if prova {
+                    Text("85 m").foregroundStyle(Theme.dim).position(x: cx, y: cy + 128)
                 }
-                Spacer(minLength: 0)
             }
-            .font(Theme.mono(10.5, .heavy))
-            .padding(.top, 8)
-            .frame(maxHeight: .infinity)
+            .font(Theme.mono(11, .heavy))
         }
-        .lineLimit(1).minimumScaleFactor(0.55)
-        .padding(.horizontal, 3)
+        .lineLimit(1).minimumScaleFactor(0.6)
+    }
+}
+
+/// Pulsanti della colonna sinistra (tavola 10): posizioni e misure della tela, 62×44 pt ciascuno.
+struct ColonnaTela: View {
+    let attivo: PannelloMappa?
+    let notte: Bool
+    var azione: (BarraStrumenti.Voce) -> Void
+    @ObservedObject private var tx = Trasmissione.shared
+
+    var body: some View {
+        GeometryReader { g in
+            let h = g.size.height
+            let inOnda = tx.stato == .open
+            ZStack(alignment: .top) {
+                voce(.strumenti, Ic.griglia, "Strumenti", Theme.olive, on: attivo == .strumenti).offset(y: 6)
+                Rectangle().fill(Theme.olive.opacity(0.3)).frame(width: 32, height: 1).offset(y: 55)
+                voce(.segnala, Ic.mSegnala, "Segnala", Theme.amber, on: attivo == .segnala).offset(y: 61)
+                voce(.squadra, Ic.mSquadra, "Squadra", Theme.cyan, on: attivo == .squadra).offset(y: 105)
+                voce(.messaggi, Ic.mMessaggi, "Messaggi", Theme.olive, on: chatAperta).offset(y: 149)
+                voce(.video, Ic.mVideo, inOnda ? "IN ONDA" : "Video", inOnda ? Theme.red : Theme.olive, on: videoAperto).offset(y: 193)
+                voce(.notte, Ic.mNotte, "Notte", notte ? Night.red : Color(hex: 0xD9D9D2), on: notte).offset(y: 237)
+                Button { azione(.impostazioni) } label: {
+                    IconaTela(d: Ic.mIngranaggio, colore: attivo == .impostazioni ? Theme.oliveBright : Theme.testo, lato: 22)
+                        .frame(width: 33, height: 33)
+                        .background(attivo == .impostazioni ? Theme.olive.opacity(0.2) : .clear, in: Circle())
+                        .frame(width: 62, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(PressStyle())
+                .accessibilityLabel("Impostazioni mappa")
+                .offset(y: h - 89 - 5.5)
+                voce(.esci, Ic.casa, "App", Theme.dim, on: false).offset(y: h - 50)
+                    .accessibilityLabel("Torna all'app")
+            }
+            .frame(width: g.size.width, height: h, alignment: .top)
+        }
+    }
+
+    var videoAperto: Bool {
+        if case .video = attivo { return true }
+        return false
+    }
+    var chatAperta: Bool {
+        if case .chat = attivo { return true }
+        return false
+    }
+
+    func voce(_ v: BarraStrumenti.Voce, _ icona: String, _ testo: String, _ colore: Color, on: Bool) -> some View {
+        Button { azione(v) } label: {
+            VStack(spacing: 3) {
+                IconaTela(d: icona, colore: colore, lato: 20)
+                Text(testo).font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.testo)
+                    .lineLimit(1).minimumScaleFactor(0.7)
+            }
+            .frame(width: 62, height: 44)
+            .background {
+                if on { RoundedRectangle(cornerRadius: 10).fill(Theme.olive.opacity(0.2)).padding(.horizontal, 3) }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressStyle())
     }
 }
 
 /// Fila in alto con gli strumenti scelti dal pannello Strumenti (tenendoli premuti).
+/// Tavola 10: nove caselle 40×39 pt a 10 pt l'una dall'altra; quelle libere sono tratteggiate con il "+".
 struct BarraRapida: View {
-    @AppStorage("mappa.rapidi") private var rapidi = "segnala,distanza,cerchi,meteo"
+    static let caselle = 9
+    @AppStorage("mappa.rapidi") private var rapidi = ""
     var usa: (Strumento) -> Void
     var aggiungi: () -> Void
 
     var body: some View {
-        let lista = rapidi.split(separator: ",").compactMap { Strumento(rawValue: String($0)) }
-        HStack(spacing: 8) {
+        let lista = Array(rapidi.split(separator: ",").compactMap { Strumento(rawValue: String($0)) }.prefix(Self.caselle))
+        HStack(spacing: 10) {
             ForEach(lista) { s in
                 Button { haptic(); usa(s) } label: {
                     VStack(spacing: 2) {
-                        Image(systemName: s.icona).font(.system(size: 15, weight: .bold)).foregroundStyle(s == .sos ? Theme.red : Theme.oliveBright)
-                        Text(String(s.nome.split(separator: " ").first ?? "")).font(.system(size: 8, weight: .bold)).foregroundStyle(.white)
+                        Image(systemName: s.icona).font(.system(size: 14, weight: .bold)).foregroundStyle(s == .sos ? Theme.red : Theme.oliveBright)
+                        Text(String(s.nome.split(separator: " ").first ?? "")).font(.system(size: 7.5, weight: .bold)).foregroundStyle(.white)
                             .lineLimit(1).minimumScaleFactor(0.6)
                     }
-                    .frame(width: 46, height: 42)
-                    .background(Color.black.opacity(0.62), in: RoundedRectangle(cornerRadius: 11))
-                    .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(Theme.stroke))
+                    .padding(.horizontal, 2)
+                    .frame(width: 40, height: 39)
+                    .background(Color.black.opacity(0.62), in: RoundedRectangle(cornerRadius: 7))
+                    .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(Theme.stroke))
                 }
                 .buttonStyle(PressStyle())
                 .contextMenu {
                     Button(role: .destructive) { BarraRapida.togli(s) } label: { Label("Togli dalla barra", systemImage: "pin.slash") }
                 }
             }
-            if lista.count < 8 {
+            ForEach(lista.count..<Self.caselle, id: \.self) { _ in
                 Button { haptic(); aggiungi() } label: {
-                    Image(systemName: "plus").font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.dim)
-                        .frame(width: 42, height: 42)
-                        .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(Theme.olive.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
+                    IconaTela(d: Ic.piu, colore: Theme.dim, lato: 13)
+                        .frame(width: 40, height: 39)
+                        .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(Theme.olive.opacity(0.5), style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
+                        .contentShape(Rectangle())
                 }
-                .accessibilityLabel("Aggiungi uno strumento alla barra")
+                .accessibilityLabel("Aggiungi strumento alla barra")
             }
         }
     }
 
     static var elenco: [String] {
-        (UserDefaults.standard.string(forKey: "mappa.rapidi") ?? "segnala,distanza,cerchi,meteo").split(separator: ",").map(String.init)
+        (UserDefaults.standard.string(forKey: "mappa.rapidi") ?? "").split(separator: ",").map(String.init)
     }
     static func contiene(_ s: Strumento) -> Bool { elenco.contains(s.rawValue) }
     static func metti(_ s: Strumento) {
         var e = elenco
-        guard !e.contains(s.rawValue), e.count < 8 else { return }
+        guard !e.contains(s.rawValue), e.count < caselle else { return }
         e.append(s.rawValue)
         UserDefaults.standard.set(e.joined(separator: ","), forKey: "mappa.rapidi")
     }
