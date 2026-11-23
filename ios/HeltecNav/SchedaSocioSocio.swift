@@ -105,7 +105,7 @@ struct SchedaSocioSocio: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 12)
-        .frame(minHeight: 46)
+        .frame(minHeight: 47)   // tavola: 46 + bordo 1
         .overlay(alignment: .bottom) { Rectangle().fill(Theme.olive.opacity(0.12)).frame(height: 1) }
     }
 }
@@ -292,8 +292,10 @@ struct DocumentiSocioView: View {
                     .buttonStyle(PressStyle())
                 }
             }
-            .padding(.horizontal, 12).padding(.vertical, 6)
-            .frame(minHeight: 56)
+            // tavola: min-height 56 + padding 6+6 + bordo 1 = 69
+            .padding(.horizontal, 12)
+            .frame(minHeight: 57)
+            .padding(.vertical, 6)
             .overlay(alignment: .bottom) { Rectangle().fill(Theme.olive.opacity(0.12)).frame(height: 1) }
             .contentShape(Rectangle())
             .onTapGesture { apri(d) }
