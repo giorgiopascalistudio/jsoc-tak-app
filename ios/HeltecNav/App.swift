@@ -52,7 +52,7 @@ struct JsocTakApp: App {
             // Home · Eventi · Associazione · Strumenti (barra in basso, colonna a sinistra in orizzontale);
             // il Profilo si apre dalla Home, la Mappa dagli eventi
             ContenitoreSchede(tab: $tab)
-            .overlay(alignment: .top) { if tab == Schede.mappa { TimerGiocoMappa().padding(.top, 64) } }
+            .overlay(alignment: .top) { if tab == Schede.mappa { VStack(spacing: 8) { TimerGiocoMappa(); TimerObjMappa() }.padding(.top, 64) } }
             .overlay(alignment: .bottom) { if tab == Schede.mappa { PercorsoMappa().padding(.bottom, 54) } }
             .overlay { GuidaSopra() }   // la guida di ogni schermata, la prima volta che si apre
             .tint(night.on ? Night.red : Theme.olive)
@@ -168,7 +168,7 @@ struct JsocTakApp: App {
                 docs.cambiaEvento()
                 Task { await docs.sync(jsoc, force: true) }
             }
-            .task { GarminPonte.shared.avvia() }
+            .task { GarminPonte.shared.avvia(); _ = TimerObj.shared }
             .onOpenURL { url in
                 Diagnostica.passo("apre link \(url.scheme ?? "")")
                 if GarminPonte.shared.apri(url) { return }

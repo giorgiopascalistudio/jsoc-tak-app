@@ -147,6 +147,8 @@ struct TimerGiocoMappa: View {
                 chip("Azzera", Theme.dim) { t.azzera() }
                 chip(t.s.avvisi ? "Avvisi −10 −5 −1" : "Avvisi spenti", t.s.avvisi ? Theme.amber : Theme.dim) { t.avvisi(!t.s.avvisi) }
             }
+            Divider().overlay(Theme.stroke)
+            ImpostazioniTimerObj()
         }
         .padding(14).frame(width: 320)
         .background(RoundedRectangle(cornerRadius: 18).fill(Theme.surface.opacity(0.97)))
