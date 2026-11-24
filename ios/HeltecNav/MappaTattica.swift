@@ -105,10 +105,11 @@ struct MappaTattica: View {
     @ObservedObject private var volume = VolumeTasti.shared
     @ObservedObject private var traccia = Traccia.shared
     @ObservedObject private var percorsoPiedi = PercorsoPiedi.shared
+    @ObservedObject private var pannelloTimer = PannelloTimerMappa.shared
     @ObservedObject private var piani = PianiStore.shared
     @State private var selezione: SelezioneMappa?
     /// colonna dei pulsanti a scomparsa (orizzontale con l'isola): esce con uno swipe da sinistra
-    @State private var barraVisibile = false
+    @State private var barraVisibile = true
     @State private var timerBarra: Task<Void, Never>?
     @State private var pannello: PannelloMappa?
     @State private var misura: [CLLocationCoordinate2D] = []
@@ -176,8 +177,8 @@ struct MappaTattica: View {
             // niente colonna informazioni né scorrimento: lo schermo è grande
             let pad = UIDevice.current.userInterfaceIdiom == .pad
             // su iPadOS 26 il margine sinistro può essere quello dei comandi della finestra: non è un'isola
-            let veraIsola = ins.left >= 30 && !pad
-            let colonna: CGFloat = veraIsola ? ins.left : 0
+            let veraIsola = !pad
+            let colonna: CGFloat = veraIsola ? max(ins.left, 44) : 0
             let isola = land && veraIsola
             // tavole 10-12: colonna sempre visibile = informazioni accanto all'isola + 62 pt di pulsanti
             let lBarra: CGFloat = land ? (isola ? colonna + 62 : 66 + colonna) : 0
@@ -274,6 +275,12 @@ struct MappaTattica: View {
         .background(Color.black)        .ignoresSafeArea()
         .background(Color.black)
         .animation(.spring(response: 0.35, dampingFraction: 0.88), value: pannello)
+        .sheet(isPresented: $pannelloTimer.aperto) {
+            ScrollView { TimerGiocoMappa(soloPannello: true) }
+                .background(Theme.surface.ignoresSafeArea())
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
         .onAppear {
             UIApplication.shared.isIdleTimerDisabled = true
             ruotaSchermo(.landscape)
@@ -706,17 +713,36 @@ struct MappaTattica: View {
 
     /// Colonna a sinistra (informazioni accanto all'isola + pulsanti), velata sopra la mappa, pannello e comandi.
     func interfacciaTela(_ s: CGSize, _ ins: UIEdgeInsets, colonna: CGFloat, lPannello: CGFloat) -> some View {
-        let lati = colonna + 62
+        // la colonna dei pulsanti si nasconde con uno swipe verso sinistra e torna con uno swipe verso destra
+        // (o toccando la maniglia); le informazioni accanto all'isola restano sempre
+        let lati = colonna + (barraVisibile ? 62 : 0)
         return ZStack(alignment: .topLeading) {
             ZStack(alignment: .topLeading) {
                 InfoIsola(spazioIsola: true).frame(width: colonna, height: s.height)
-                ColonnaTela(attivo: pannello, notte: night.on, azione: barra)
-                    .frame(width: 62, height: s.height)
-                    .offset(x: colonna)
+                if barraVisibile {
+                    ColonnaTela(attivo: pannello, notte: night.on, azione: barra)
+                        .frame(width: 62, height: s.height)
+                        .offset(x: colonna)
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                }
             }
             .frame(width: lati, height: s.height, alignment: .topLeading)
             .background(Color(red: 6 / 255, green: 8 / 255, blue: 5 / 255).opacity(0.72))
             .overlay(alignment: .trailing) { Rectangle().fill(Theme.olive.opacity(0.22)).frame(width: 1) }
+            .contentShape(Rectangle())
+            .simultaneousGesture(DragGesture(minimumDistance: 14).onEnded { v in
+                if v.translation.width < -28, barraVisibile { haptic(); withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) { barraVisibile = false } }
+                else if v.translation.width > 28, !barraVisibile { haptic(); withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) { barraVisibile = true } }
+            })
+            if !barraVisibile {
+                // maniglia: tocca o trascina per riaprire i pulsanti
+                Capsule().fill(Theme.olive.opacity(0.8)).frame(width: 5, height: 52)
+                    .padding(.horizontal, 8).padding(.vertical, 20).contentShape(Rectangle())
+                    .onTapGesture { haptic(); withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) { barraVisibile = true } }
+                    .gesture(DragGesture(minimumDistance: 10).onEnded { v in if v.translation.width > 20 { withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) { barraVisibile = true } } })
+                    .position(x: colonna + 10, y: s.height / 2)
+                    .accessibilityLabel("Mostra i pulsanti")
+            }
             if let p = pannello {
                 pannelloVista(p).padding(.bottom, ins.bottom)
                     .frame(width: lPannello, height: s.height)
@@ -783,7 +809,7 @@ struct MappaTattica: View {
             // sotto la bussola: timer (solo se attivo, o dal tasto) e navigazione con profilo altimetrico
             ColonnaNavigazione()
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                .padding(.top, 116).padding(.trailing, 17)
+                .padding(.top, 116).padding(.trailing, 11)
             if let o = ctl.offline {
                 ProgressView(value: Double(o.fatti), total: Double(o.totale)) {
                     Text("Scarico la zona: \(o.fatti)/\(o.totale)").font(Theme.mono(10, .bold))
@@ -806,6 +832,8 @@ struct MappaTattica: View {
             .frame(height: 24, alignment: .top)
             .allowsHitTesting(false)
             .position(x: cx, y: s.height - 36 + 12)
+            PillolaTimerGioco()
+                .position(x: cx, y: s.height - 36 - 22)
             // segui la mia posizione: libera → segue → segue orientata
             Button {
                 haptic(.medium); ctl.cicloModo()
@@ -837,6 +865,9 @@ struct MappaTattica: View {
                     }
                     .accessibilityLabel("Impostazioni e mappe")
                 }
+                ColonnaNavigazione()
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.top, 56).padding(.trailing, 1)
                 if let a = avviso {
                     Text(a).font(.system(size: 12, weight: .heavy)).foregroundStyle(.white)
                         .padding(.horizontal, 12).padding(.vertical, 7)
@@ -855,7 +886,11 @@ struct MappaTattica: View {
                 .background(Color.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 10))
             }
             HStack(alignment: .bottom, spacing: 8) {
-                ScalaMappa(metriPerPunto: ctl.metriPerPunto).padding(.leading, 12)
+                VStack(alignment: .leading, spacing: 6) {
+                    PillolaTimerGioco()
+                    ScalaMappa(metriPerPunto: ctl.metriPerPunto)
+                }
+                .padding(.leading, 12)
                 Spacer()
                 tastoTondo("location.north.fill", Theme.red, rotazione: -ctl.rotazione) { ctl.nordInAlto() }
                     .accessibilityLabel("Nord in alto")

@@ -144,20 +144,51 @@ struct ColonnaNavigazione: View {
     @State private var tic = 0
     private let ogni = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
 
+    @State private var dettaglio: String?
+
+    /// nella colonna della bussola (larga quanto i tasti tondi) solo la navigazione in piccolo;
+    /// toccandola si aprono i dettagli in un foglio dal basso. Il timer sta in basso accanto alla scala.
     var body: some View {
-        VStack(alignment: .trailing, spacing: 8) {
-            // tasto Timer tondo come nord e 2D; il timer compare solo se attivo
-            Button { haptic(); pannelloTimer.toggle(); if pannelloTimer { GuidaApp.shared.entra("mappa.timer") } } label: {
-                Image(systemName: "timer").font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(tg.s.corsa || to.attivo != nil ? Theme.green : Theme.olive)
-                    .frame(width: 44, height: 44).background(Theme.bg, in: Circle())
-            }
-            .accessibilityLabel("Timer")
-            if pannelloTimer || tg.s.corsa || tg.secondi != tg.s.durata { TimerGiocoMappa(apertoIniziale: pannelloTimer) }
-            TimerObjMappa()
-            if let t = navStore.target { scheda(t).id(tic) }
+        VStack(spacing: 8) {
+            if let t = navStore.target { compatta(t).id(tic) }
         }
+        .frame(width: 56)
         .onReceive(ogni) { _ in if navStore.target != nil { tic += 1 } }
+        .sheet(isPresented: Binding(get: { dettaglio != nil }, set: { if !$0 { dettaglio = nil } })) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    if let t = navStore.target { scheda(t).id(tic) }
+                }
+                .padding(16)
+            }
+            .background(Theme.surface.ignoresSafeArea())
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+    }
+
+    /// navigazione in piccolo: freccia verso dove andare, metri e minuti
+    func compatta(_ t: GaraPoint) -> some View {
+        let io = LocationService.corrente?.location
+        let valido = p.valido(per: t)
+        let av = valido ? io.flatMap { p.avanzamento($0.coordinate) } : nil
+        let metri = av?.resto ?? io.map { $0.distance(from: CLLocation(latitude: t.lat, longitude: t.lon)) }
+        let verso = io.map { Geo.bearing($0.coordinate, CLLocationCoordinate2D(latitude: t.lat, longitude: t.lon)) }
+        let gira = verso.map { $0 - (LocationService.corrente?.heading ?? 0) } ?? 0
+        let fuori = (av?.fuori ?? 0) > 40
+        return Button { haptic(); dettaglio = "nav" } label: {
+            VStack(spacing: 2) {
+                Image(systemName: "location.north.fill").font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.cyan)
+                    .rotationEffect(.degrees(gira))
+                Text(metri.map { $0 >= 1000 ? String(format: "%.1fkm", $0 / 1000) : "\(Int($0))m" } ?? "—")
+                    .font(.system(size: 10, weight: .heavy, design: .monospaced)).foregroundStyle(Theme.testo).lineLimit(1).minimumScaleFactor(0.7)
+                Text(metri.map { "\(Int($0 / 80))'" } ?? "").font(.system(size: 9, weight: .heavy, design: .monospaced)).foregroundStyle(Theme.dim)
+            }
+            .frame(width: 52, height: 62).background(Theme.bg.opacity(0.92), in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(fuori ? Theme.amber : Theme.cyan, lineWidth: 1.5))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Navigazione verso \(t.id)")
     }
 
     func scheda(_ t: GaraPoint) -> some View {
@@ -202,9 +233,7 @@ struct ColonnaNavigazione: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(10).frame(width: 168)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Theme.bg.opacity(0.92)))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.cyan.opacity(0.7), lineWidth: 1))
+        .padding(12).frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

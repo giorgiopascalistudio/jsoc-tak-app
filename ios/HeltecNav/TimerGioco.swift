@@ -103,13 +103,66 @@ final class TimerGioco: ObservableObject {
 }
 
 /// Pillola in mappa (tocca per i comandi) + pannello.
+/// impostazioni del timer aperte dalla mappa: si mostrano in un foglio dal basso (mai mezzo coperte)
+final class PannelloTimerMappa: ObservableObject {
+    static let shared = PannelloTimerMappa()
+    @Published var aperto = false
+    func apri() { aperto = true; GuidaApp.shared.entra("mappa.timer") }
+}
+
+/// pillola piccola del timer di gioco, solo quando è attivo; in basso accanto alla scala, dove non copre niente
+struct PillolaTimerGioco: View {
+    @ObservedObject private var t = TimerGioco.shared
+    @ObservedObject private var to = TimerObj.shared
+    @State private var obj = false
+    var body: some View {
+        HStack(spacing: 6) {
+            if t.s.corsa || t.secondi != (t.s.modo == "crono" ? 0 : t.s.durata) { TimerGiocoMappa() }
+            else {
+                Button { haptic(); PannelloTimerMappa.shared.apri() } label: {
+                    Image(systemName: "timer").font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.olive)
+                        .frame(width: 32, height: 32).background(Color.black.opacity(0.72), in: Circle())
+                }
+                .accessibilityLabel("Timer")
+            }
+            if let a = to.attivo {
+                let r = to.rimasti
+                let col = r <= 60 ? Theme.red : (r <= 300 ? Theme.amber : Theme.oliveBright)
+                Button { haptic(); obj = true } label: {
+                    HStack(spacing: 6) {
+                        Text(a.obj).font(.system(size: 9, weight: .heavy, design: .monospaced)).foregroundStyle(Theme.dim).lineLimit(1)
+                        Text(TimerGioco.testo(max(r, 0))).font(.system(size: 15, weight: .heavy, design: .monospaced)).foregroundStyle(col)
+                    }
+                    .padding(.horizontal, 10).padding(.vertical, 6)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color(hex: 0x0F1C10).opacity(0.94)))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(col, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            } else if let v = to.vicino {
+                Button { haptic(); obj = true } label: {
+                    Text("\(v.obj) · \(v.metri) m · avvia?").font(.system(size: 11, weight: .heavy, design: .monospaced)).foregroundStyle(Theme.testo)
+                        .padding(.horizontal, 10).padding(.vertical, 7)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Color(hex: 0x0F1C10).opacity(0.94)))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.red, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .sheet(isPresented: $obj) {
+            ScrollView { TimerObjMappa().padding(16) }
+                .background(Theme.surface.ignoresSafeArea())
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+        }
+    }
+}
+
 struct TimerGiocoMappa: View {
     @ObservedObject private var t = TimerGioco.shared
-    var apertoIniziale = false
-    @State private var aperto = false
+    var soloPannello = false
     var body: some View {
-        VStack(spacing: 8) {
-            Button { aperto.toggle(); if aperto { GuidaApp.shared.entra("mappa.timer") } } label: {
+        if soloPannello { pannello } else {
+            Button { PannelloTimerMappa.shared.apri() } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "timer").font(.system(size: 13, weight: .bold))
                     Text(t.s.modo == "crono" ? "CRONO" : "FINE GIOCO").font(.system(size: 9, weight: .heavy, design: .monospaced))
@@ -121,7 +174,6 @@ struct TimerGiocoMappa: View {
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(t.s.corsa ? Theme.green : Theme.amber, lineWidth: 1))
             }
             .buttonStyle(.plain)
-            if aperto || apertoIniziale { pannello }
         }
     }
 
@@ -151,9 +203,7 @@ struct TimerGiocoMappa: View {
             Divider().overlay(Theme.stroke)
             ImpostazioniTimerObj()
         }
-        .padding(14).frame(width: 320)
-        .background(RoundedRectangle(cornerRadius: 18).fill(Theme.surface.opacity(0.97)))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Theme.stroke, lineWidth: 1))
+        .padding(16).frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func chip(_ s: String, _ c: Color = Theme.oliveBright, _ a: @escaping () -> Void) -> some View {
