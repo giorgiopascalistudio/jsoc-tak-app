@@ -780,6 +780,10 @@ struct MappaTattica: View {
             }
             .accessibilityLabel("Vista 2D/3D")
             .position(x: destra, y: 72 + 17)
+            // sotto la bussola: timer (solo se attivo, o dal tasto) e navigazione con profilo altimetrico
+            ColonnaNavigazione()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .padding(.top, 116).padding(.trailing, 17)
             if let o = ctl.offline {
                 ProgressView(value: Double(o.fatti), total: Double(o.totale)) {
                     Text("Scarico la zona: \(o.fatti)/\(o.totale)").font(Theme.mono(10, .bold))

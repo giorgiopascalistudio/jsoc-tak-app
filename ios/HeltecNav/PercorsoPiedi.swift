@@ -6,7 +6,16 @@ import CoreLocation
 @MainActor
 final class PercorsoPiedi: ObservableObject {
     static let shared = PercorsoPiedi()
-    struct Nav: Codable, Equatable { var nome: String; var lat: Double; var lon: Double; var punti: [[Double]]; var km: Double; var minuti: Int }
+    struct Nav: Codable, Equatable {
+        var nome: String; var lat: Double; var lon: Double; var punti: [[Double]]; var km: Double; var minuti: Int
+        var quote: [Double]? = nil
+        var salita: Int { Int(zip(quote ?? [], (quote ?? []).dropFirst()).reduce(0.0) { $0 + max($1.1 - $1.0, 0) }) }
+        var discesa: Int { Int(zip(quote ?? [], (quote ?? []).dropFirst()).reduce(0.0) { $0 + max($1.0 - $1.1, 0) }) }
+        var difficolta: String {
+            let perKm = km > 0 ? Double(salita) / km : 0
+            return km > 12 || perKm > 100 ? "impegnativa" : (km > 5 || perKm > 40 ? "media" : "facile")
+        }
+    }
     @Published private(set) var nav: Nav?
     @Published private(set) var stato = ""
     @Published private(set) var versione = 0
@@ -32,7 +41,7 @@ final class PercorsoPiedi: ObservableObject {
     func calcola(verso t: GaraPoint) async {
         guard let io = LocationService.corrente?.location?.coordinate else { stato = "Aspetto il GPS"; return }
         stato = "calcolo"
-        let q = #"{"locations":[{"lat":\#(io.latitude),"lon":\#(io.longitude)},{"lat":\#(t.lat),"lon":\#(t.lon)}],"costing":"pedestrian","costing_options":{"pedestrian":{"use_tracks":1.0,"max_hiking_difficulty":4}},"units":"kilometers"}"#
+        let q = #"{"locations":[{"lat":\#(io.latitude),"lon":\#(io.longitude)},{"lat":\#(t.lat),"lon":\#(t.lon)}],"costing":"pedestrian","costing_options":{"pedestrian":{"use_tracks":1.0,"max_hiking_difficulty":4}},"units":"kilometers","elevation_interval":30}"#
         var c = URLComponents(string: "https://valhalla1.openstreetmap.de/route")!
         c.queryItems = [URLQueryItem(name: "json", value: q)]
         var r = URLRequest(url: c.url!, timeoutInterval: 25)
@@ -45,8 +54,9 @@ final class PercorsoPiedi: ObservableObject {
                 stato = "Percorso non trovato: resta la linea d'aria"; return
             }
             let punti = legs.flatMap { Self.decodifica($0["shape"] as? String ?? "") }
+            let quote = legs.flatMap { ($0["elevation"] as? [NSNumber] ?? []).map { $0.doubleValue } }
             salva(Nav(nome: t.id, lat: t.lat, lon: t.lon, punti: punti,
-                      km: (somma["length"] as? NSNumber)?.doubleValue ?? 0, minuti: Int(((somma["time"] as? NSNumber)?.doubleValue ?? 0) / 60)))
+                      km: (somma["length"] as? NSNumber)?.doubleValue ?? 0, minuti: Int(((somma["time"] as? NSNumber)?.doubleValue ?? 0) / 60), quote: quote))
             stato = ""
         } catch { stato = "Senza rete: resta la linea d'aria" }
     }
@@ -120,6 +130,102 @@ struct PercorsoMappa: View {
             .background(RoundedRectangle(cornerRadius: 14).fill(Color(hex: 0x101C1E).opacity(0.94)))
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.cyan, lineWidth: 1.2))
             .onReceive(ogni) { _ in tic += 1 }
+        }
+    }
+}
+
+/// Colonna a destra sotto la bussola (tavola 12): tasto Timer, timer attivi, navigazione con profilo altimetrico.
+struct ColonnaNavigazione: View {
+    @ObservedObject private var p = PercorsoPiedi.shared
+    @ObservedObject private var navStore = NavStore.shared
+    @ObservedObject private var tg = TimerGioco.shared
+    @ObservedObject private var to = TimerObj.shared
+    @State private var pannelloTimer = false
+    @State private var tic = 0
+    private let ogni = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 8) {
+            // tasto Timer tondo come nord e 2D; il timer compare solo se attivo
+            Button { haptic(); pannelloTimer.toggle(); if pannelloTimer { GuidaApp.shared.entra("mappa.timer") } } label: {
+                Image(systemName: "timer").font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(tg.s.corsa || to.attivo != nil ? Theme.green : Theme.olive)
+                    .frame(width: 44, height: 44).background(Theme.bg, in: Circle())
+            }
+            .accessibilityLabel("Timer")
+            if pannelloTimer || tg.s.corsa || tg.secondi != tg.s.durata { TimerGiocoMappa(apertoIniziale: pannelloTimer) }
+            TimerObjMappa()
+            if let t = navStore.target { scheda(t).id(tic) }
+        }
+        .onReceive(ogni) { _ in if navStore.target != nil { tic += 1 } }
+    }
+
+    func scheda(_ t: GaraPoint) -> some View {
+        let io = LocationService.corrente?.location
+        let valido = p.valido(per: t)
+        let av = valido ? io.flatMap { p.avanzamento($0.coordinate) } : nil
+        let metri = av?.resto ?? io.map { $0.distance(from: CLLocation(latitude: t.lat, longitude: t.lon)) }
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("→ \(t.id)").font(.system(size: 13, weight: .black)).foregroundStyle(Theme.testo).lineLimit(1)
+                Spacer(minLength: 4)
+                Button { p.ferma(); navStore.target = nil } label: { Image(systemName: "xmark").font(.system(size: 11, weight: .heavy)).foregroundStyle(Theme.dim) }
+                    .buttonStyle(.plain)
+            }
+            if p.stato == "calcolo" {
+                Text("Calcolo il percorso…").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.cyan)
+            } else if let m = metri {
+                Text((m >= 1000 ? String(format: "%.1f km", m / 1000) : "\(Int(m)) m") + " · \(Int(m / 80)) min")
+                    .font(.system(size: 17, weight: .heavy, design: .monospaced)).foregroundStyle(Theme.testo)
+                Text(valido ? "a piedi" : "linea d'aria").font(.system(size: 11, weight: .bold)).foregroundStyle(Theme.cyan)
+            }
+            if let a = av, a.fuori > 40 {
+                Text("FUORI PERCORSO \(Int(a.fuori)) m").font(.system(size: 11, weight: .heavy)).foregroundStyle(Theme.amber)
+            }
+            if valido, let n = p.nav, let q = n.quote, q.count >= 2 {
+                Text("↑\(n.salita) m ↓\(n.discesa) m · \(n.difficolta)").font(.system(size: 11, weight: .heavy, design: .monospaced))
+                    .foregroundStyle(n.difficolta == "facile" ? Theme.green : (n.difficolta == "media" ? Theme.amber : Theme.red))
+                ProfiloAltimetrico(quote: q, fatto: av.map { 1 - $0.resto / max(n.km * 1000, 1) } ?? 0)
+                    .frame(height: 54)
+                HStack {
+                    Text("\(Int(q.min() ?? 0)) m").font(.system(size: 9, weight: .bold, design: .monospaced)).foregroundStyle(Theme.dim)
+                    Spacer()
+                    Text("\(Int(q.max() ?? 0)) m").font(.system(size: 9, weight: .bold, design: .monospaced)).foregroundStyle(Theme.dim)
+                }
+            }
+            if !p.stato.isEmpty && p.stato != "calcolo" { Text(p.stato).font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.amber) }
+            Button { Task { await p.calcola(verso: t) } } label: {
+                Text(valido ? "Ricalcola" : "Percorso a piedi").font(.system(size: 12, weight: .heavy)).foregroundStyle(Theme.cyan)
+                    .frame(maxWidth: .infinity).padding(.vertical, 7)
+                    .background(RoundedRectangle(cornerRadius: 9).fill(Theme.cyan.opacity(0.14)))
+                    .overlay(RoundedRectangle(cornerRadius: 9).stroke(Theme.cyan.opacity(0.5), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(10).frame(width: 168)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Theme.bg.opacity(0.92)))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.cyan.opacity(0.7), lineWidth: 1))
+    }
+}
+
+/// Profilo altimetrico del percorso; la parte già fatta è più chiara.
+struct ProfiloAltimetrico: View {
+    let quote: [Double]
+    let fatto: Double
+    var body: some View {
+        GeometryReader { g in
+            let lo = quote.min() ?? 0, hi = max((quote.max() ?? 1), lo + 10)
+            let pts = quote.enumerated().map { i, q in
+                CGPoint(x: g.size.width * CGFloat(i) / CGFloat(max(quote.count - 1, 1)), y: g.size.height * (1 - CGFloat((q - lo) / (hi - lo))))
+            }
+            let linea = Path { p in p.addLines(pts) }
+            let area = Path { p in p.move(to: CGPoint(x: 0, y: g.size.height)); p.addLines(pts); p.addLine(to: CGPoint(x: g.size.width, y: g.size.height)); p.closeSubpath() }
+            ZStack {
+                area.fill(Theme.cyan.opacity(0.18))
+                linea.stroke(Theme.cyan, style: StrokeStyle(lineWidth: 2, lineJoin: .round))
+                Rectangle().fill(Theme.testo).frame(width: 2)
+                    .position(x: g.size.width * CGFloat(min(max(fatto, 0), 1)), y: g.size.height / 2)
+            }
         }
     }
 }

@@ -52,8 +52,6 @@ struct JsocTakApp: App {
             // Home · Eventi · Associazione · Strumenti (barra in basso, colonna a sinistra in orizzontale);
             // il Profilo si apre dalla Home, la Mappa dagli eventi
             ContenitoreSchede(tab: $tab)
-            .overlay(alignment: .top) { if tab == Schede.mappa { VStack(spacing: 8) { TimerGiocoMappa(); TimerObjMappa() }.padding(.top, 64) } }
-            .overlay(alignment: .bottom) { if tab == Schede.mappa { PercorsoMappa().padding(.bottom, 54) } }
             .overlay { GuidaSopra() }   // la guida di ogni schermata, la prima volta che si apre
             .tint(night.on ? Night.red : Theme.olive)
             // modalità notturna: tutto moltiplicato per il rosso (il nero resta nero, il bianco diventa rosso).

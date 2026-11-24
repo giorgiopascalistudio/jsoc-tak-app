@@ -105,6 +105,7 @@ final class TimerGioco: ObservableObject {
 /// Pillola in mappa (tocca per i comandi) + pannello.
 struct TimerGiocoMappa: View {
     @ObservedObject private var t = TimerGioco.shared
+    var apertoIniziale = false
     @State private var aperto = false
     var body: some View {
         VStack(spacing: 8) {
@@ -120,7 +121,7 @@ struct TimerGiocoMappa: View {
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(t.s.corsa ? Theme.green : Theme.amber, lineWidth: 1))
             }
             .buttonStyle(.plain)
-            if aperto { pannello }
+            if aperto || apertoIniziale { pannello }
         }
     }
 
