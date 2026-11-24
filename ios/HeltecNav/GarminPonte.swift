@@ -75,6 +75,7 @@ final class GarminPonte: NSObject, ObservableObject {
             "t": "stato",
             "ev": presenze.prefix(8).map { [$0.id, $0.nome, $0.dataInizio.map { f.string(from: $0) } ?? "", $0.tipo] as [Any] },
             "notte": UserDefaults.standard.bool(forKey: "night.on"),
+            "tm": TimerGioco.shared.perOrologio,
         ]
         if let e = s.corrente {
             m["id"] = e.id
@@ -111,6 +112,7 @@ extension GarminPonte: IQAppMessageDelegate {
             case "evento":
                 if let id = d["id"] as? Int, let e = EventoStore.shared.eventi.first(where: { $0.id == id }) { EventoStore.shared.scegli(e) }
                 self.inviaStato(subito: true)
+            case "timer": TimerGioco.shared.daOrologio(d)
             case "pos":
                 // posizione dell'orologio: il telefono la usa al posto del suo GPS (batteria)
                 func num(_ k: String) -> Double? { (d[k] as? NSNumber)?.doubleValue }
