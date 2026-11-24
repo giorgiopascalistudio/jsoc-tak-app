@@ -104,6 +104,7 @@ struct MappaTattica: View {
     @ObservedObject private var nav = NavStore.shared
     @ObservedObject private var volume = VolumeTasti.shared
     @ObservedObject private var traccia = Traccia.shared
+    @ObservedObject private var percorsoPiedi = PercorsoPiedi.shared
     @ObservedObject private var piani = PianiStore.shared
     @State private var selezione: SelezioneMappa?
     /// colonna dei pulsanti a scomparsa (orizzontale con l'isola): esce con uno swipe da sinistra
@@ -547,7 +548,7 @@ struct MappaTattica: View {
     /// Cambia quando cambia qualcosa da disegnare sulla mappa.
     var firmaDisegni: String {
         let d = store.corrente?.disegni ?? []
-        return "\(d.count)-\(d.last?.id ?? 0)-\(misura.count)-\(misura.last?.latitude ?? 0)-\(cerchiCentro?.latitude ?? 0)-\(cerchiCentro?.longitude ?? 0)-\(cerchiRaggi)-\(modo == .cerchi)-\(rotta.tappe.count)-\(rotta.tappe.last?.longitude ?? 0)-\(traccia.punti.count)-\(mostraAree)-\(livelli.versione)-\(DatiEvento.aree.count)-\(piani.versione)"
+        return "\(d.count)-\(d.last?.id ?? 0)-\(misura.count)-\(misura.last?.latitude ?? 0)-\(cerchiCentro?.latitude ?? 0)-\(cerchiCentro?.longitude ?? 0)-\(cerchiRaggi)-\(modo == .cerchi)-\(rotta.tappe.count)-\(rotta.tappe.last?.longitude ?? 0)-\(traccia.punti.count)-\(mostraAree)-\(livelli.versione)-\(DatiEvento.aree.count)-\(piani.versione)-\(percorsoPiedi.versione)"
     }
 
     func aggiornaDisegni() {
@@ -559,6 +560,7 @@ struct MappaTattica: View {
         }
         func cc(_ c: [CLLocationCoordinate2D]) -> [[Double]] { c.map { [$0.latitude, $0.longitude] } }
         if traccia.punti.count >= 2 { el.append(ElementoLivello(id: "t-traccia", tipo: "traccia", coord: cc(traccia.punti), colore: "#FF8C26")) }
+        if let pp = percorsoPiedi.nav, pp.punti.count >= 2 { el.append(ElementoLivello(id: "t-percorso", tipo: "traccia", coord: pp.punti, colore: "#73C7DB")) }
         // piano di gara scelto: il percorso con le tappe numerate, per tutta la squadra
         if store.idCorrente > 0, let p = piani.scelto(store.idCorrente), p.tappe.count >= 2 {
             el.append(ElementoLivello(id: "t-piano", tipo: "rotta", coord: p.tappe.map { [$0.lat, $0.lon] }, testo: p.nome, colore: "#4FC3F7"))
