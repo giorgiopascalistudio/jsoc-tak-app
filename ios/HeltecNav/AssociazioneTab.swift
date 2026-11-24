@@ -11,6 +11,7 @@ struct AssociazioneTab: View {
     var direttivo: Bool { jsoc.utente?.direttivo == true }
 
     var body: some View {
+        let _ = GuidaApp.segna("associazione")
         let _ = Contatori.disegno("AssociazioneTab")
         NavigationStack {
             Group {
@@ -88,6 +89,7 @@ struct BachecaSociView: View {
     @State private var scrivi = false
 
     var body: some View {
+        let _ = GuidaApp.segna("bacheca")
         ScrollView {
             LazyVStack(spacing: 12) {
                 if post.isEmpty { Text("Nessun annuncio").foregroundStyle(Theme.dim).padding(.top, 40) }
@@ -323,6 +325,7 @@ struct SociView: View {
     var direttivo: Bool { jsoc.utente?.direttivo == true }
 
     var body: some View {
+        let _ = GuidaApp.segna("soci")
         List {
             let soci = (dati?.soci ?? []).filter { cerca.isEmpty || ($0.callsign + " " + $0.nome).localizedCaseInsensitiveContains(cerca) }
             ForEach(soci) { s in
@@ -538,6 +541,7 @@ struct SondaggiView: View {
     @State private var errore: String?
 
     var body: some View {
+        let _ = GuidaApp.segna("sondaggi")
         ScrollView {
             LazyVStack(spacing: 12) {
                 if lista.isEmpty { Text("Nessun sondaggio").foregroundStyle(Theme.dim).padding(.top, 40) }
@@ -848,6 +852,7 @@ struct MagazzinoView: View {
     @State private var errore: String?
 
     var body: some View {
+        let _ = GuidaApp.segna("magazzino")
         let cat = Dictionary(grouping: lista) { ($0.categoria ?? "").isEmpty ? "Altro" : $0.categoria!.capitalized }
         List {
             if lista.isEmpty { Text("Magazzino vuoto").foregroundStyle(Theme.dim).listRowBackground(Theme.surface) }

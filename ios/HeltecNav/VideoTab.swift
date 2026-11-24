@@ -209,6 +209,7 @@ struct VideoTab: View {
     @State private var impostazioni = false
 
     var body: some View {
+        let _ = GuidaApp.segna("video")
         VStack(spacing: 0) {
             Picker("", selection: $seg) {
                 Text("Trasmetti").tag(0)

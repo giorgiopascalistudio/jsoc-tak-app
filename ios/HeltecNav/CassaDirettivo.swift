@@ -75,6 +75,7 @@ struct NuovoMovimentoV3: View {
     var categorie: [(String, String)] { tipo == 0 ? Self.categorieEntrata : Self.categorieUscita }
 
     var body: some View {
+        let _ = GuidaApp.segna("movimento")
         VStack(alignment: .leading, spacing: 0) {
             // intestazione: Annulla · titolo 17 al centro · Salva
             HStack {

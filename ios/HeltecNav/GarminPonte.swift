@@ -111,6 +111,13 @@ extension GarminPonte: IQAppMessageDelegate {
             case "evento":
                 if let id = d["id"] as? Int, let e = EventoStore.shared.eventi.first(where: { $0.id == id }) { EventoStore.shared.scegli(e) }
                 self.inviaStato(subito: true)
+            case "pos":
+                // posizione dell'orologio: il telefono la usa al posto del suo GPS (batteria)
+                func num(_ k: String) -> Double? { (d[k] as? NSNumber)?.doubleValue }
+                if let la = num("la"), let lo = num("lo") {
+                    LocationService.corrente?.posizioneOrologio(lat: la, lon: lo, precisione: num("acc") ?? 15, quota: num("q"),
+                                                                direzione: num("d"), velocita: num("v"))
+                }
             case "chat":
                 if let testo = d["testo"] as? String, let id = EventoStore.shared.corrente?.id {
                     _ = try? await JsocClient.shared.scrivi(id, testo, nil)

@@ -28,6 +28,7 @@ struct CipherTab: View {
     var strumento: Strumento { Strumento(rawValue: strumentoRaw) ?? .decifra }
 
     var body: some View {
+        let _ = GuidaApp.segna("cifrari")
         NavigationStack {
             VStack(spacing: 0) {
                 HStack(spacing: 5) {

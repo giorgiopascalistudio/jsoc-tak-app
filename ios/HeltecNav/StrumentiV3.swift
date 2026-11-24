@@ -150,6 +150,7 @@ struct StrumentiV3: View {
     @State private var premuto: String?      // dopo una pressione lunga il tocco non apre lo strumento
 
     var body: some View {
+        let _ = GuidaApp.segna("strumenti")
         let _ = Contatori.disegno("StrumentiV3")
         NavigationStack(path: $percorso) {
             contenuto

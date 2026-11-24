@@ -46,6 +46,7 @@ struct EventiV3: View {
     var ipad: Bool { classe == .regular && UIDevice.current.userInterfaceIdiom == .pad }
 
     var body: some View {
+        let _ = GuidaApp.segna("eventi")
         let _ = Contatori.disegno("EventiV3")
         NavigationStack(path: $percorso) {
             Group {

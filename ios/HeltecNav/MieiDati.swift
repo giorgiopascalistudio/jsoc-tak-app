@@ -256,6 +256,7 @@ struct MieiDatiView: View {
     @State private var visibili = true
 
     var body: some View {
+        let _ = GuidaApp.segna("miei_dati")
         VStack(spacing: 0) {
             if pannello { intestazionePannello } else {
                 IntestazioneModulo(titolo: salute ? "Salute" : "I miei dati", salvato: salvato) { salva() }

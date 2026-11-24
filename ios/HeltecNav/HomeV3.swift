@@ -48,6 +48,7 @@ struct HomeV3: View {
     @State private var tuttiDaFare = false
 
     var body: some View {
+        let _ = GuidaApp.segna("home")
         let _ = Contatori.disegno("HomeV3")
         NavigationStack(path: $percorso) {
             Group {

@@ -466,6 +466,7 @@ struct TesseramentoView: View {
     @State private var csv: URL?
 
     var body: some View {
+        let _ = GuidaApp.segna("tesseramento")
         List {
             if let errore { Text(errore).foregroundStyle(Theme.red) }
             Section { SelettoreAnno(anno: $anno) }
@@ -661,6 +662,7 @@ struct AspirantiView: View {
     @State private var invito = false
     @State private var errore: String?
     var body: some View {
+        let _ = GuidaApp.segna("aspiranti")
         List {
             if let errore { Text(errore).foregroundStyle(Theme.red) }
             Section {
@@ -896,6 +898,7 @@ struct CassaV2View: View {
     }
 
     var body: some View {
+        let _ = GuidaApp.segna("cassa")
         List {
             if let errore { Text(errore).foregroundStyle(Theme.red) }
             if let c {
@@ -1495,6 +1498,7 @@ struct AssembleaView: View {
     @State private var chiudi = false
 
     var body: some View {
+        let _ = GuidaApp.segna("assemblea")
         ScrollView {
             VStack(spacing: 12) {
                 if let errore { ErrorCard(text: errore) }

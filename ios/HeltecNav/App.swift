@@ -52,6 +52,7 @@ struct JsocTakApp: App {
             // Home · Eventi · Associazione · Strumenti (barra in basso, colonna a sinistra in orizzontale);
             // il Profilo si apre dalla Home, la Mappa dagli eventi
             ContenitoreSchede(tab: $tab)
+            .overlay { GuidaSopra() }   // la guida di ogni schermata, la prima volta che si apre
             .tint(night.on ? Night.red : Theme.olive)
             // modalità notturna: tutto moltiplicato per il rosso (il nero resta nero, il bianco diventa rosso).
             // Solo quando è accesa: un filtro su tutta l'app costa un passaggio in più a ogni fotogramma

@@ -153,6 +153,7 @@ struct CoordinateV3: View {
     }
 
     var body: some View {
+        let _ = GuidaApp.segna("coordinate")
         if pannello { corpoPannello } else { corpoTelefono }
     }
 

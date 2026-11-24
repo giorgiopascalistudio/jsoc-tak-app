@@ -16,6 +16,14 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     private let manager = CLLocationManager()
     private let altimeter = CMAltimeter()
 
+    /// L'ultima istanza creata: la usa il ponte Garmin per passare la posizione dell'orologio.
+    static weak var corrente: LocationService?
+    /// Orologio Garmin che manda la posizione: finché è fresca il GPS del telefono resta al minimo (batteria).
+    @Published private(set) var daOrologio = false
+    private var orologioFino = Date.distantPast
+    private var inSfondo = false
+    private var controlloOrologio: Timer?
+
     override init() {
         super.init()
         manager.delegate = self
@@ -27,12 +35,46 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
         manager.allowsBackgroundLocationUpdates = true
         manager.pausesLocationUpdatesAutomatically = false
         manager.showsBackgroundLocationIndicator = true
+        Self.corrente = self
     }
 
     /// In background meno precisione (batteria); in primo piano la migliore.
     func sfondo(_ inBackground: Bool) {
-        manager.desiredAccuracy = inBackground ? kCLLocationAccuracyNearestTenMeters : kCLLocationAccuracyBest
-        manager.distanceFilter = inBackground ? 10 : 2
+        inSfondo = inBackground
+        precisione()
+    }
+
+    private func precisione() {
+        if daOrologio {
+            // resta acceso solo per tenere viva l'app in background, senza consumare il GPS
+            manager.desiredAccuracy = kCLLocationAccuracyThreeKilometers
+            manager.distanceFilter = 500
+            manager.stopUpdatingHeading()
+        } else {
+            manager.desiredAccuracy = inSfondo ? kCLLocationAccuracyNearestTenMeters : kCLLocationAccuracyBest
+            manager.distanceFilter = inSfondo ? 10 : 2
+            if CLLocationManager.headingAvailable() { manager.startUpdatingHeading() }
+        }
+    }
+
+    /// Posizione arrivata dall'orologio Garmin: vale per 45 s, poi si torna al GPS del telefono.
+    func posizioneOrologio(lat: Double, lon: Double, precisione acc: Double, quota: Double?, direzione: Double?, velocita: Double?) {
+        let l = CLLocation(coordinate: .init(latitude: lat, longitude: lon), altitude: quota ?? 0,
+                           horizontalAccuracy: acc, verticalAccuracy: quota == nil ? -1 : 10,
+                           course: direzione ?? -1, speed: velocita ?? -1, timestamp: Date())
+        orologioFino = Date().addingTimeInterval(45)
+        if !daOrologio {
+            daOrologio = true
+            precisione()
+            controlloOrologio = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] t in
+                guard let self, Date() > self.orologioFino else { return }
+                t.invalidate(); self.controlloOrologio = nil
+                self.daOrologio = false
+                self.precisione()
+            }
+        }
+        if let direzione { heading = direzione }
+        location = l
     }
 
     func start() {
@@ -87,6 +129,7 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
     }
 
     func locationManager(_ m: CLLocationManager, didUpdateLocations locs: [CLLocation]) {
+        if daOrologio { return }   // vale la posizione dell'orologio
         location = locs.last
     }
 
@@ -94,6 +137,7 @@ final class LocationService: NSObject, ObservableObject, CLLocationManagerDelega
 
     /// Ogni cambio pubblicato ridisegna l'app: al massimo ~8 volte al secondo e solo se la direzione cambia davvero.
     func locationManager(_ m: CLLocationManager, didUpdateHeading h: CLHeading) {
+        if daOrologio { return }
         let nuovo = h.trueHeading >= 0 ? h.trueHeading : h.magneticHeading
         let diff = abs(((nuovo - (heading ?? -999)) + 540).truncatingRemainder(dividingBy: 360) - 180)
         let ora = Date()

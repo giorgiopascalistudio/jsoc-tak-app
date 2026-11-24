@@ -18,6 +18,7 @@ struct ProfiloTab: View {
     @State private var moduloIPad = UserDefaults.standard.string(forKey: "debug.modulo") == "salute" ? "Salute" : "I miei dati"
 
     var body: some View {
+        let _ = GuidaApp.segna("profilo")
         let _ = Contatori.disegno("ProfiloTab")
         Group {
             if classe == .regular {
@@ -353,6 +354,11 @@ struct ImpostazioniProfilo: View {
                 Toggle("Modalità notturna (rosso)", isOn: Binding(get: { night.on }, set: { if $0 != night.on { night.toggle() } }))
                 NavigationLink("Server e collegamento") { ServerInfoView() }
             }
+            Section {
+                Button("Mostra di nuovo la guida in tutte le schermate") { GuidaApp.shared.ricomincia(); GuidaApp.shared.rivedi("profilo") }
+                Toggle("Non mostrare più la guida", isOn: Binding(get: { UserDefaults.standard.bool(forKey: "guida.mai") },
+                                                                    set: { UserDefaults.standard.set($0, forKey: "guida.mai") }))
+            } header: { Text("Guida") } footer: { Text("Ogni schermata ha una piccola guida che compare la prima volta che la apri.") }
         }
         .listaJSOC()
         .navigationTitle("Impostazioni")

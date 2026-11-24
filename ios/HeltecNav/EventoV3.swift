@@ -120,6 +120,7 @@ struct EventoV3: View {
     var ipad: Bool { classe == .regular && UIDevice.current.userInterfaceIdiom == .pad }
 
     var body: some View {
+        let _ = GuidaApp.segna("evento")
         let _ = Contatori.disegno("EventoV3")
         GeometryReader { g in
             if incorporato && ipad && g.size.width >= 560 {

@@ -57,6 +57,7 @@ struct NuovoEventoV3: View {
                                                   ("riunione", "Riunione", Theme.cyan), ("altro", "Assoc.", Theme.amber)]
 
     var body: some View {
+        let _ = GuidaApp.segna("nuovo_evento")
         VStack(spacing: 0) {
             intestazione
             ScrollView {

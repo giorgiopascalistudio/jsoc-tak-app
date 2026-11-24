@@ -36,6 +36,7 @@ struct GiochiV3: View {
     var livello: LivelloProva { [.facile, .medio, .difficile, .difficile][min(max(difficolta, 0), 3)] }
 
     var body: some View {
+        let _ = GuidaApp.segna("giochi")
         VStack(alignment: .leading, spacing: 0) {
             if pannello {
                 Text("Giochi e missioni").font(.system(size: 30, weight: .black)).tracking(-0.6).foregroundStyle(Theme.testo)

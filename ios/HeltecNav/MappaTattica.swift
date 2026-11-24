@@ -165,6 +165,7 @@ struct MappaTattica: View {
     }
 
     var body: some View {
+        let _ = GuidaApp.segna("mappa")
         GeometryReader { g in
             let land = g.size.width > g.size.height || UIDevice.current.userInterfaceIdiom == .pad
             let ins = margini
