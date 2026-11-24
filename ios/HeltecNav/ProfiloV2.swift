@@ -51,7 +51,7 @@ struct ProfiloTab: View {
 
     var contenutoIPad: some View {
         GeometryReader { g in
-            let sinistra = min(520, (g.size.width - 100) * 0.5)
+            let sinistra = max((g.size.width - 100) * 0.5, min(520, g.size.width - 580))   // tavola: 520 in orizzontale
             HStack(alignment: .top, spacing: 0) {
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 12) {
@@ -71,7 +71,7 @@ struct ProfiloTab: View {
                         }
                     }
                     .padding(.top, 26).padding(.bottom, 22)
-                    .frame(minHeight: g.size.height + 60, alignment: .top)
+                    .frame(minHeight: g.size.height + 120, alignment: .top)
                 }
                 .frame(width: sinistra)
                 .padding(.leading, 30).padding(.trailing, 24)
