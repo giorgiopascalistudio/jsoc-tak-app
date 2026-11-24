@@ -136,6 +136,10 @@ struct CoordinateV3: View {
     @State private var luogo: String?
     @State private var copiato: String?
     @FocusState private var fuoco: Int?
+    /// iPad (tavola 70): nel pannello a destra di Strumenti, senza tasto indietro
+    var pannello = false
+
+    init(pannello: Bool = false) { self.pannello = pannello }
 
     /// punto mostrato nelle righe e usato dai tre tasti
     var punto: CLLocationCoordinate2D? {
@@ -149,6 +153,45 @@ struct CoordinateV3: View {
     }
 
     var body: some View {
+        if pannello { corpoPannello } else { corpoTelefono }
+    }
+
+    /// iPad (tavola 70): titolo 30, spazio 12, righe senza intestazione e senza G M S
+    var corpoPannello: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Coordinate").font(.system(size: 30, weight: .black)).tracking(-0.6).foregroundStyle(Theme.testo)
+                    .padding(.top, 2)
+                SchedeTela(voci: ["Dove sono", "Converti", "Distanza"], scelta: $scheda)
+                switch scheda {
+                case 0: doveSono
+                case 1: campo("Incolla o scrivi", $testo, 1)
+                default:
+                    campo("Da (vuoto = dove sono)", $da, 2)
+                    campo("A", $testo, 1)
+                }
+                if scheda == 2, let a = partenza, let b = punto { distanza(a, b) }
+                if let p = punto {
+                    VStack(spacing: 0) {
+                        ForEach(Array(FormatiCoordinate.righe(p).filter { $0.0 != "G M S" }.enumerated()), id: \.offset) { i, r in
+                            riga(r.0, r.1, evidenzia: i == 0)
+                        }
+                    }
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.stroke))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+                tasti
+            }
+            .padding(.bottom, 30)
+        }
+        .scrollDismissesKeyboardSeVa()
+        .background(Theme.bg)
+        .onChange(of: testo) { UserDefaults.standard.set($0, forKey: "strum.coord.testo") }
+        .task(id: punto.map { String(format: "%.4f,%.4f", $0.latitude, $0.longitude) } ?? "") { await cercaLuogo() }
+    }
+
+    var corpoTelefono: some View {
         VStack(alignment: .leading, spacing: 0) {
             // intestazione: top 54, lati 14
             HStack(spacing: 8) {
@@ -200,11 +243,11 @@ struct CoordinateV3: View {
                     .font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.testo)
                     .textInputAutocapitalization(.characters).autocorrectionDisabled()
                     .focused($fuoco, equals: id)
-                Button {
+                if !pannello { Button {
                     haptic()
                     if let s = UIPasteboard.general.string { t.wrappedValue = s.trimmingCharacters(in: .whitespacesAndNewlines) }
                 } label: { IconaTela(d: Ic.stAppunti, colore: Theme.olive, lato: 17) }
-                .accessibilityLabel("Incolla")
+                .accessibilityLabel("Incolla") }
             }
             if let r {
                 NotaCampo(testo: "Riconosciuto: \(r.formato)" + (id == 1 && luogo != nil ? " · vicino a \(luogo!)" : ""),
@@ -243,7 +286,35 @@ struct CoordinateV3: View {
         .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).strokeBorder(Theme.stroke))
     }
 
-    func riga(_ nome: String, _ valore: String, evidenzia: Bool = false) -> some View {
+    @ViewBuilder func riga(_ nome: String, _ valore: String, evidenzia: Bool = false) -> some View {
+        if pannello { rigaPannello(nome, valore, evidenzia: evidenzia) } else { rigaTelefono(nome, valore, evidenzia: evidenzia) }
+    }
+
+    /// riga della tavola 70: nome 96 pt, valore mono 15, icona copia 16 senza riquadro
+    func rigaPannello(_ nome: String, _ valore: String, evidenzia: Bool) -> some View {
+        HStack(spacing: 12) {
+            Text(nome).font(.system(size: 12, weight: .heavy)).foregroundStyle(evidenzia ? Theme.oliveBright : Theme.dim)
+                .frame(width: 96, alignment: .leading)
+            Text(valore).font(Theme.mono(15, .heavy)).foregroundStyle(Theme.testo)
+                .lineLimit(1).minimumScaleFactor(0.7)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
+            Button {
+                UIPasteboard.general.string = valore
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                copiato = nome
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { if copiato == nome { copiato = nil } }
+            } label: {
+                IconaTela(d: copiato == nome ? Ic.spunta : Ic.stCopia, colore: copiato == nome ? Theme.oliveBright : Theme.dim, lato: 16)
+                    .frame(width: 28, height: 20).contentShape(Rectangle())
+            }
+            .accessibilityLabel("Copia \(nome)")
+        }
+        .padding(.leading, 14).padding(.trailing, 8).padding(.vertical, 11)
+        .overlay(alignment: .top) { Rectangle().fill(Theme.olive.opacity(0.12)).frame(height: 1) }
+    }
+
+    func rigaTelefono(_ nome: String, _ valore: String, evidenzia: Bool) -> some View {
         HStack(spacing: 10) {
             Text(nome).font(.system(size: 11, weight: .heavy)).foregroundStyle(evidenzia ? Theme.oliveBright : Theme.dim)
                 .frame(width: 78, alignment: .leading)
@@ -285,7 +356,34 @@ struct CoordinateV3: View {
 
     // MARK: In mappa · Naviga · Invia
 
-    var tasti: some View {
+    @ViewBuilder var tasti: some View {
+        if pannello { tastiPannello } else { tastiTelefono }
+    }
+
+    /// tavola 70: tre tasti uguali alti 48, angoli 14, solo testo
+    var tastiPannello: some View {
+        HStack(spacing: 8) {
+            Button { inMappa(naviga: false) } label: { tastoPannello("In mappa", pieno: true) }.buttonStyle(PressStyle())
+            Button { inMappa(naviga: true) } label: { tastoPannello("Naviga", pieno: false) }.buttonStyle(PressStyle())
+            if let p = punto {
+                ShareLink(item: FormatiCoordinate.testoDaInviare(p)) { tastoPannello("Invia", pieno: false) }.buttonStyle(PressStyle())
+            } else {
+                tastoPannello("Invia", pieno: false)
+            }
+        }
+        .disabled(punto == nil)
+        .opacity(punto == nil ? 0.5 : 1)
+    }
+
+    func tastoPannello(_ t: String, pieno: Bool) -> some View {
+        Text(t).font(.system(size: 14.5, weight: pieno ? .black : .heavy)).foregroundStyle(pieno ? Theme.scuro : Theme.testo)
+            .frame(maxWidth: .infinity).frame(height: 48)
+            .background(pieno ? Theme.olive : Color.clear, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(pieno ? Color.clear : Theme.testo.opacity(0.18)))
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    var tastiTelefono: some View {
         HStack(spacing: 7) {
             Button { inMappa(naviga: false) } label: { etichettaTasto("In mappa", Ic.segnaposto, pieno: true) }
                 .buttonStyle(PressStyle())
@@ -320,7 +418,9 @@ struct CoordinateV3: View {
         let mio = esistente ?? store.salva(PuntoMio(nome: "COORD", lat: p.latitude, lon: p.longitude, tipo: "wp",
                                                     nota: "da Strumenti › Coordinate"))
         if naviga { store.target = mio.punto }
+        MappaTattica.centroInSospeso = p
         vaiAllaScheda(Schede.mappa)
+        NotificationCenter.default.post(name: .mappaCentra, object: nil)
     }
 
     func cercaLuogo() async {

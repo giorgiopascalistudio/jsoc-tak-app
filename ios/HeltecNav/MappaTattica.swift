@@ -83,7 +83,18 @@ private let fondoPannello = Color(red: 0.043, green: 0.051, blue: 0.031)
 
 // MARK: - Schermata
 
+extension Notification.Name { static let mappaCentra = Notification.Name("jsoc.mappaCentra") }
+
 struct MappaTattica: View {
+    /// punto su cui centrarsi alla prossima apertura (Strumenti › Coordinate › In mappa / Naviga)
+    static var centroInSospeso: CLLocationCoordinate2D?
+
+    func centraInSospeso() {
+        guard let c = Self.centroInSospeso else { return }
+        Self.centroInSospeso = nil
+        ctl.vai(c, zoom: max(ctl.zoom, 15))
+    }
+
     @EnvironmentObject var location: LocationService
     @EnvironmentObject var docs: DocStore
     @EnvironmentObject var night: NightMode
@@ -267,6 +278,7 @@ struct MappaTattica: View {
             aggiornaSegni()
             aggiornaDisegni()
             applicaLivelli()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { centraInSospeso() }
             if Anteprima.mappaAttiva {
                 // anteprime sul simulatore: stessa inquadratura delle tavole 10-12 (e Ruota aperta su OBJ 03)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { ctl.vai(Anteprima.centroMappa, zoom: Anteprima.zoomMappa) }
@@ -318,6 +330,8 @@ struct MappaTattica: View {
         .onReceive(NotificationCenter.default.publisher(for: .loraMessaggio)) { n in
             if let t = n.userInfo?["testo"] as? String { mostra("📡 " + t) }
         }
+        // Strumenti › Coordinate › "In mappa": centra sul punto (se la mappa era già aperta)
+        .onReceive(NotificationCenter.default.publisher(for: .mappaCentra)) { _ in centraInSospeso() }
         .onReceive(importate.$elenco) { _ in DispatchQueue.main.async { importate.applica(ctl.mappa) } }
         .onChange(of: pannello) { p in
             // chiudendo il pannello dello strumento finisce anche la modalità

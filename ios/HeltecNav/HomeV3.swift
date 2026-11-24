@@ -366,6 +366,9 @@ struct SchedaProssimo: View {
         }
         .frame(height: grande ? 150 : 92)
         .clipped()
+        // .clipped() taglia solo il disegno: senza questa riga la foto di copertina (scaledToFill) riceve
+        // i tocchi anche fuori dal riquadro e "ruba" campanella e avatar dell'intestazione
+        .contentShape(Rectangle())
     }
 
     func piede(_ e: JEvento) -> String {

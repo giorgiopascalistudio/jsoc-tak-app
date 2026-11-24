@@ -13,9 +13,29 @@ struct ProfiloTab: View {
     @State private var esci = false
     @State private var dispositivo = false
     @State private var moduloDebug = UserDefaults.standard.string(forKey: "debug.modulo") != nil
+    @Environment(\.horizontalSizeClass) private var classe
+    // iPad: modulo aperto nel pannello a destra (anteprime: -debug.modulo salute apre Salute)
+    @State private var moduloIPad = UserDefaults.standard.string(forKey: "debug.modulo") == "salute" ? "Salute" : "I miei dati"
 
     var body: some View {
         let _ = Contatori.disegno("ProfiloTab")
+        Group {
+            if classe == .regular {
+                GeometryReader { g in
+                    if g.size.width > 900 {
+                        Group { if jsoc.collegato { contenutoIPad } else { NavigationStack { EntraView() } } }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .background(Theme.bg.ignoresSafeArea())
+                    } else { telefono }
+                }
+            } else { telefono }
+        }
+        .sheet(isPresented: $qr) { QRAppello() }
+        .sheet(isPresented: $dispositivo) { InvitoSheet(dispositivo: true) }
+        .task { await carica() }
+    }
+
+    var telefono: some View {
         NavigationStack {
             Group {
                 if jsoc.collegato { contenuto } else { EntraView() }
@@ -25,9 +45,70 @@ struct ProfiloTab: View {
             // anteprime: -debug.modulo dati|salute (+ -debug.scheda 1) apre direttamente il modulo
             .navigationDestination(isPresented: $moduloDebug) { MieiDatiView(salute: UserDefaults.standard.string(forKey: "debug.modulo") == "salute") }
         }
-        .sheet(isPresented: $qr) { QRAppello() }
-        .sheet(isPresented: $dispositivo) { InvitoSheet(dispositivo: true) }
-        .task { await carica() }
+    }
+
+    // MARK: iPad (tavola IPadProfilo13): a sinistra profilo largo 520, linea, a destra il modulo scelto
+
+    var contenutoIPad: some View {
+        GeometryReader { g in
+            let sinistra = max((g.size.width - 100) * 0.5, min(520, g.size.width - 580))   // tavola: 520 in orizzontale
+            HStack(alignment: .top, spacing: 0) {
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Profilo").font(.system(size: 30, weight: .black)).tracking(-0.6).foregroundStyle(Theme.testo).padding(.top, 2)
+                        tessera(grande: true)
+                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                            ForEach(riquadriIPad, id: \.titolo) { r in
+                                Button { haptic(.soft); moduloIPad = r.titolo } label: { RiquadroProfiloIPad(r: r, scelto: r.titolo == moduloIPad) }
+                                    .buttonStyle(PressStyle())
+                            }
+                        }
+                        Spacer(minLength: 0)
+                        // fuori dalla tavola: si raggiunge scorrendo
+                        Button { esci = true } label: {
+                            Text("Esci da questo dispositivo").font(.system(size: 13.5, weight: .heavy)).foregroundStyle(Theme.red)
+                                .frame(maxWidth: .infinity).frame(height: 40)
+                        }
+                    }
+                    .padding(.top, 26).padding(.bottom, 22)
+                    .frame(minHeight: g.size.height + 120, alignment: .top)
+                }
+                .frame(width: sinistra)
+                .padding(.leading, 30).padding(.trailing, 24)
+                Rectangle().fill(Theme.olive.opacity(0.16)).frame(width: 1).ignoresSafeArea(edges: .vertical)
+                pannelloIPad
+                    .padding(.leading, 23).padding(.trailing, 22)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            }
+        }
+        .confirmationDialog("Uscire da JSOC TAK su questo dispositivo?", isPresented: $esci, titleVisibility: .visible) {
+            Button("Esci", role: .destructive) { jsoc.esci() }
+        } message: { Text("Per rientrare servirà un nuovo invito.") }
+    }
+
+    @ViewBuilder var pannelloIPad: some View {
+        if let r = riquadriIPad.first(where: { $0.titolo == moduloIPad }) {
+            NavigationStack { r.vista().background(Theme.bg.ignoresSafeArea()) }
+                .id(moduloIPad)
+        }
+    }
+
+    /// tavola iPad: ordine e sottotitoli diversi dal telefono, I miei dati e Salute nel pannello senza "indietro"
+    var riquadriIPad: [Riquadro] {
+        let base = Dictionary(riquadri.map { ($0.titolo, $0) }, uniquingKeysWith: { a, _ in a })
+        let ordine = ["I miei dati", "Salute", "Quote e presenze", "Documenti", "Attrezzatura", "Archivio", "Impostazioni", "Dispositivi"]
+        return ordine.compactMap { t in
+            guard var r = base[t] else { return nil }
+            switch t {
+            case "I miei dati": r.sotto = "anagrafica, contatti"; r.vista = { AnyView(MieiDatiView(pannello: true)) }
+            case "Salute": r.sotto = "certificato, emergenza"; r.vista = { AnyView(MieiDatiView(salute: true, pannello: true)) }
+            case "Documenti": r.sotto = "tessera, certificato, assicurazione"; r.colore = Theme.dim
+            case "Archivio": r.sotto = "tracce e pacchetti"
+            case "Impostazioni": r.sotto = "posizione, notte, server"
+            default: r.sotto = r.sotto.prefix(1).lowercased() + r.sotto.dropFirst()
+            }
+            return r
+        }
     }
 
     var contenuto: some View {
@@ -46,7 +127,7 @@ struct ProfiloTab: View {
             .padding(.horizontal, 14).padding(.top, 7)
 
             VStack(alignment: .leading, spacing: 11) {
-                tessera
+                tessera()
                 completezza
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                     ForEach(riquadri, id: \.titolo) { r in
@@ -69,13 +150,14 @@ struct ProfiloTab: View {
 
     // MARK: tessera (tavola: fondo #1d2416, bordo verde 35%, avatar 58, sigla mono 19, QR bianco 48)
 
-    var tessera: some View {
-        HStack(spacing: 12) {
-            FotoSocio(id: jsoc.utente?.id, iniziali: jsoc.utente?.callsign ?? "?", lato: 58)
+    /// grande = iPad (tavola IPadProfilo13: avatar 64, sigla 22, QR 54)
+    func tessera(grande: Bool = false) -> some View {
+        HStack(spacing: grande ? 14 : 12) {
+            FotoSocio(id: jsoc.utente?.id, iniziali: jsoc.utente?.callsign ?? "?", lato: grande ? 64 : 58)
                 .overlay(Circle().strokeBorder(Theme.olive, lineWidth: 2))
             VStack(alignment: .leading, spacing: 0) {
-                Text(jsoc.utente?.callsign ?? "").font(Theme.mono(19, .heavy)).foregroundStyle(Theme.testo)
-                Text(sottotitolo).font(.system(size: 12)).foregroundStyle(Theme.testo2).lineLimit(1).padding(.top, 1)
+                Text(jsoc.utente?.callsign ?? "").font(Theme.mono(grande ? 22 : 19, .heavy)).foregroundStyle(Theme.testo)
+                Text(sottotitolo).font(.system(size: grande ? 13 : 12)).foregroundStyle(Theme.testo2).lineLimit(1).padding(.top, 1)
                 HStack(spacing: 5) {
                     ForEach(etichette, id: \.0) { Etichetta(testo: $0.0, colore: $0.1) }
                 }
@@ -83,12 +165,13 @@ struct ProfiloTab: View {
             }
             Spacer(minLength: 0)
             Button { qr = true } label: {
-                IconaTela(d: Ic.qr, colore: Theme.scuro, lato: 26)
-                    .frame(width: 48, height: 48).background(Theme.testo, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                IconaTela(d: Ic.qr, colore: Theme.scuro, lato: grande ? 28 : 26)
+                    .frame(width: grande ? 54 : 48, height: grande ? 54 : 48)
+                    .background(Theme.testo, in: RoundedRectangle(cornerRadius: grande ? 15 : 14, style: .continuous))
             }
             .accessibilityLabel("Mostra il QR per l'appello")
         }
-        .padding(.horizontal, 14).padding(.vertical, 12)
+        .padding(.horizontal, grande ? 16 : 14).padding(.vertical, grande ? 14 : 12)
         .background(Color(hex: 0x1D2416), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Theme.olive.opacity(0.35)))
     }
@@ -149,9 +232,9 @@ struct ProfiloTab: View {
     // MARK: riquadri
 
     struct Riquadro {
-        let icona: String; let colore: Color; let titolo: String; let sotto: String
+        let icona: String; var colore: Color; let titolo: String; var sotto: String
         var segno: String? = nil; var coloreSegno: Color = Theme.dim; var bordo: Color? = nil
-        let vista: () -> AnyView
+        var vista: () -> AnyView
     }
 
     var riquadri: [Riquadro] {
@@ -213,6 +296,29 @@ struct RiquadroProfilo: View {
         .frame(maxWidth: .infinity, alignment: .leading).frame(height: 100)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(r.bordo?.opacity(0.4) ?? Theme.stroke))
+    }
+}
+
+/// riquadro iPad (tavola IPadProfilo13): alto 96, icona 20 senza fondo, il riquadro scelto ha il bordo verde 2
+struct RiquadroProfiloIPad: View {
+    let r: ProfiloTab.Riquadro
+    let scelto: Bool
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top) {
+                IconaTela(d: r.icona, colore: r.colore, lato: 20)
+                Spacer()
+                if let s = r.segno { Text(s).font(.system(size: 10.5, weight: .heavy)).foregroundStyle(r.coloreSegno).padding(.top, 2) }
+            }
+            Spacer(minLength: 0)
+            Text(r.titolo).font(.system(size: 14.5, weight: .heavy)).foregroundStyle(Theme.testo)
+            Text(r.sotto).font(.system(size: 11)).foregroundStyle(Theme.dim).lineLimit(1)
+        }
+        .padding(.horizontal, 13).padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading).frame(height: 96)
+        .background(scelto ? Color(hex: 0x1D2416) : Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(scelto ? Theme.olive : Theme.stroke, lineWidth: scelto ? 2 : 1))
+        .contentShape(Rectangle())
     }
 }
 

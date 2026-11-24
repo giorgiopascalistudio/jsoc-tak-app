@@ -6,4 +6,7 @@ extension Ic {
     static let comunicazioni = "M4 4h16v16H4Z M8 8h8 M8 12h8 M8 16h5"
     static let assemblee = "M4 21V9l8-6 8 6v12 M9 21v-6h6v6"
     static let menu = "M4 6h16 M4 12h16 M4 18h16"
+    // tavola 69 (iPad): una persona sola e il foglio con due righe
+    static let sociIPad = "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z M2.5 20a6.5 6.5 0 0 1 13 0"
+    static let comunicazioniIPad = "M4 4h16v16H4Z M8 8h8 M8 12h8"
 }

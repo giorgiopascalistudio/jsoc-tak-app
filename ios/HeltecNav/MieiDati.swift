@@ -212,6 +212,8 @@ enum CodiceFiscale {
 
 struct MieiDatiView: View {
     var salute = false
+    /// iPad: modulo nel pannello a destra del Profilo (tavola IPadProfilo13), senza "indietro", campi affiancati
+    var pannello = false
     @ObservedObject private var jsoc = JsocClient.shared
     @State private var scheda = UserDefaults.standard.integer(forKey: "debug.scheda")
     @State private var salvato = false
@@ -255,9 +257,11 @@ struct MieiDatiView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            IntestazioneModulo(titolo: salute ? "Salute" : "I miei dati", salvato: salvato) { salva() }
+            if pannello { intestazionePannello } else {
+                IntestazioneModulo(titolo: salute ? "Salute" : "I miei dati", salvato: salvato) { salva() }
+            }
             ScrollView {
-                VStack(alignment: .leading, spacing: 11) {
+                VStack(alignment: .leading, spacing: pannello ? 12 : 11) {
                     SchedeTela(voci: salute ? ["Certificato", "Emergenza"] : ["Anagrafica", "Contatti e residenza"], scelta: $scheda)
                     if let errore { Text(errore).font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.red) }
                     if salute {
@@ -266,14 +270,14 @@ struct MieiDatiView: View {
                         if scheda == 0 { anagrafica } else { contatti }
                     }
                 }
-                .padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 30)
+                .padding(.horizontal, pannello ? 0 : 14).padding(.top, 12).padding(.bottom, 30)
             }
             .scrollDismissesKeyboard(.interactively)
         }
         .background(Theme.bg.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
-        .onAppear { ModuliAperti.shared.aperti += 1 }   // tavole 33-36: senza la barra in basso
-        .onDisappear { ModuliAperti.shared.aperti = max(0, ModuliAperti.shared.aperti - 1) }
+        .onAppear { if !pannello { ModuliAperti.shared.aperti += 1 } }   // tavole 33-36: senza la barra in basso
+        .onDisappear { if !pannello { ModuliAperti.shared.aperti = max(0, ModuliAperti.shared.aperti - 1) } }
         .task { await carica() }
         .sheet(isPresented: $fotocamera) { CameraPicker { img in carica(img.ridotta(lato: 1800).jpegData(compressionQuality: 0.8), "image/jpeg") }.ignoresSafeArea() }
         .fileImporter(isPresented: $importaFile, allowedContentTypes: [.pdf, .image]) { r in
@@ -290,11 +294,25 @@ struct MieiDatiView: View {
         }
     }
 
-    // MARK: tavola 33 · Anagrafica
+    /// iPad: titolo 30 e "Salva" alto 40 (tavola IPadProfilo13)
+    var intestazionePannello: some View {
+        HStack(alignment: .bottom) {
+            Text(salute ? "Salute" : "I miei dati").font(.system(size: 30, weight: .black)).tracking(-0.6).foregroundStyle(Theme.testo)
+            Spacer()
+            Button { salva() } label: {
+                Text(salvato ? "Salvato ✓" : "Salva").font(.system(size: 14.5, weight: .black)).foregroundStyle(Theme.scuro)
+                    .padding(.horizontal, 18).frame(height: 40)
+                    .background(Theme.olive, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+        }
+        .padding(.top, 26)
+    }
+
+    // MARK: tavola 33 · Anagrafica (iPad: data e comune affiancati)
 
     var anagrafica: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: pannello ? 12 : 11) {
+            HStack(spacing: pannello ? 12 : 8) {
                 CampoTesto(etichetta: "Nome", testo: $nome.cambia { aggiornaCF() })
                 CampoTesto(etichetta: "Cognome", testo: $cognome.cambia { aggiornaCF() })
             }
@@ -302,20 +320,37 @@ struct MieiDatiView: View {
                 EtichettaCampo(testo: "Sesso")
                 SceltaTela(voci: ["Maschio", "Femmina"], scelta: $sesso.cambia { aggiornaCF() })
             }
-            VStack(alignment: .leading, spacing: 4) {
-                EtichettaCampo(testo: "Data di nascita")
-                Button { withAnimation(.easeOut(duration: 0.2)) { ruotaAperta.toggle() } } label: {
-                    RiquadroCampo(attivo: ruotaAperta) {
-                        Text(testoNascita).font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.testo)
-                        Spacer()
-                        IconaTela(d: Ic.calendario, colore: Theme.dim, lato: 18)
+            if pannello {
+                HStack(alignment: .top, spacing: 12) { campoNascita; campoComune }
+                if ruotaAperta { RuotaData(data: $nascita.cambia { aggiornaCF() }) }
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    campoNascita
+                    if ruotaAperta {
+                        RuotaData(data: $nascita.cambia { aggiornaCF() }).padding(.top, 2)
                     }
                 }
-                .buttonStyle(.plain)
-                if ruotaAperta {
-                    RuotaData(data: $nascita.cambia { aggiornaCF() }).padding(.top, 2)
+                campoComune
+            }
+            campoCF
+        }
+    }
+
+    var campoNascita: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            EtichettaCampo(testo: "Data di nascita")
+            Button { withAnimation(.easeOut(duration: 0.2)) { ruotaAperta.toggle() } } label: {
+                RiquadroCampo(attivo: ruotaAperta) {
+                    Text(testoNascita).font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.testo).lineLimit(1)
+                    Spacer()
+                    IconaTela(d: Ic.calendario, colore: pannello ? Theme.olive : Theme.dim, lato: pannello ? 17 : 18)
                 }
             }
+            .buttonStyle(.plain)
+        }
+    }
+
+    var campoComune: some View {
             VStack(alignment: .leading, spacing: 0) {
                 CampoTesto(etichetta: "Comune di nascita", testo: $comune.cambia { comuneScelto = ComuniIT.trova(comune); aggiornaCF() }, icona: Ic.cerca)
                 let proposte = comuneScelto == nil ? ComuniIT.cerca(comune) : []
@@ -324,8 +359,11 @@ struct MieiDatiView: View {
                         comuneScelto = proposte[i]; comune = "\(proposte[i].nome) (\(proposte[i].sigla))"; aggiornaCF()
                     }
                 }
-                NotaCampo(testo: "Scrivi le prime lettere: ti propone i comuni")
+                if !pannello { NotaCampo(testo: "Scrivi le prime lettere: ti propone i comuni") }
             }
+    }
+
+    var campoCF: some View {
             VStack(alignment: .leading, spacing: 0) {
                 VStack(alignment: .leading, spacing: 4) {
                     EtichettaCampo(testo: "Codice fiscale")
@@ -333,14 +371,13 @@ struct MieiDatiView: View {
                         TextField("", text: $cf.cambia { cfAMano = true })
                             .font(Theme.mono(15, .semibold)).foregroundStyle(cfAMano ? Theme.testo : Theme.testo2)
                             .textInputAutocapitalization(.characters).autocorrectionDisabled()
-                        IconaTela(d: Ic.bacchetta, colore: Theme.dim, lato: 18)
+                        IconaTela(d: Ic.bacchetta, colore: pannello ? Theme.oliveBright : Theme.dim, lato: pannello ? 17 : 18)
                     }
                 }
                 NotaCampo(testo: cfAMano ? "Scritto a mano · tocca la bacchetta per ricalcolare" : "Calcolato dai dati sopra · tocca per correggere",
                           colore: Theme.oliveBright, icona: Ic.spunta)
                     .onTapGesture { if cfAMano { cfAMano = false; aggiornaCF() } }
             }
-        }
     }
 
     var testoNascita: String {

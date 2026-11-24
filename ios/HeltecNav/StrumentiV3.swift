@@ -41,6 +41,35 @@ struct VoceStrumento: Identifiable, Hashable {
 
     static func con(_ id: String) -> VoceStrumento? { tutte.first { $0.id == id } }
 
+    /// iPad (tavola 70): sottotitolo e icona dei riquadri come nella tavola
+    static let tavola70: [String: (String, String)] = [
+        "mirino": ("azimut", "M12 3v4 M12 17v4 M3 12h4 M17 12h4"),
+        "triangolazione": ("da 2-3 rilevamenti", "M12 3 3 20h18Z"),
+        "telemetro": ("distanza dalla foto", "M3 12h18 M3 9v6 M21 9v6"),
+        "soccorso": ("MARCH", Ic.stCroce),
+        "cifrari": ("Cesare, Morse", Ic.stLucchetto),
+        "raccolta": ("foto, audio, QR", "M4 7h4l2-3h4l2 3h4v12H4Z"),
+        "archivio": ("tracce e punti", "M3 7l9-4 9 4v10l-9 4-9-4Z M3 7l9 4 9-4 M12 11v10"),
+        "prove": ("bomba, enigmi", Ic.stFulmine),
+        "missioni": ("fasi, indizi", Ic.stBandiera),
+        "dacampo": ("bandiera, nucleare", "M12 2c2 3 5 4 5 9a5 5 0 0 1-10 0"),
+    ]
+    var sottoIPad: String { Self.tavola70[id]?.0 ?? sotto }
+    var iconaIPad: String { Self.tavola70[id]?.1 ?? icona }
+
+    /// su iPad questi si aprono nel pannello a destra; gli altri (fotocamera, bussola, mappe) a schermo intero come sul telefono
+    var nelPannello: Bool { ["coordinate", "prove", "missioni", "dacampo"].contains(id) }
+
+    /// la schermata nel pannello iPad (senza tasto indietro)
+    @ViewBuilder var vistaPannello: some View {
+        switch id {
+        case "coordinate": CoordinateV3(pannello: true)
+        case "prove": GiochiV3(scheda: 0, pannello: true)
+        case "missioni": GiochiV3(scheda: 1, pannello: true)
+        default: GiochiV3(scheda: 2, pannello: true)
+        }
+    }
+
     /// la schermata vera dello strumento (quelle già esistenti; Coordinate e Giochi rifatte sulle tavole 65-66)
     @ViewBuilder var vista: some View {
         switch id {
@@ -101,10 +130,19 @@ enum BarraRapidaStrumenti {
 }
 
 struct StrumentiV3: View {
+    @Environment(\.horizontalSizeClass) private var classe
     @State private var percorso: [String] = {
         // anteprime: -debug.strum.apri coordinate|prove|missioni|dacampo|<id strumento>
-        if let a = UserDefaults.standard.string(forKey: "debug.strum.apri"), VoceStrumento.con(a) != nil { return [a] }
+        if let a = UserDefaults.standard.string(forKey: "debug.strum.apri"), let v = VoceStrumento.con(a) {
+            if UIDevice.current.userInterfaceIdiom == .pad && v.nelPannello { return [] }
+            return [a]
+        }
         return []
+    }()
+    /// iPad: strumento aperto nel pannello a destra (tavola 70: Coordinate)
+    @State private var scelto: String = {
+        if let a = UserDefaults.standard.string(forKey: "debug.strum.apri"), VoceStrumento.con(a)?.nelPannello == true { return a }
+        return "coordinate"
     }()
     @State private var recenti = RecentiStrumenti.elenco
     @State private var cerca = false
@@ -135,7 +173,77 @@ struct StrumentiV3: View {
         .animation(.spring(response: 0.3), value: avviso)
     }
 
-    var contenuto: some View {
+    @ViewBuilder var contenuto: some View {
+        if classe == .regular { contenutoIPad } else { contenutoTelefono }
+    }
+
+    // MARK: iPad (tavola 70): a sinistra titolo, cerca e i 12 riquadri; a destra il pannello dello strumento scelto
+
+    var contenutoIPad: some View {
+        HStack(alignment: .top, spacing: 0) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .bottom) {
+                    Text("Strumenti").font(.system(size: 30, weight: .black)).tracking(-0.6).foregroundStyle(Theme.testo)
+                        .padding(.top, 2)
+                    Spacer()
+                    Button { haptic(); cerca = true } label: {
+                        IconaTela(d: Ic.cerca, colore: Theme.testo, lato: 18)
+                            .frame(width: 44, height: 44).background(Theme.surface, in: Circle()).overlay(Circle().strokeBorder(Theme.stroke))
+                    }
+                    .accessibilityLabel("Cerca")
+                }
+                ScrollView(showsIndicators: false) {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
+                        ForEach(VoceStrumento.tutte) { v in riquadroIPad(v) }
+                    }
+                }
+            }
+            .padding(.leading, 30).padding(.trailing, 24).padding(.top, 26).padding(.bottom, 22)
+            .frame(maxWidth: .infinity)
+            Rectangle().fill(Theme.olive.opacity(0.16)).frame(width: 1).ignoresSafeArea()
+            Group {
+                if let v = VoceStrumento.con(scelto) { v.vistaPannello.id(scelto) }
+            }
+            .padding(.leading, 23).padding(.trailing, 22).padding(.top, 26).padding(.bottom, 22)
+            .frame(width: 503)
+            .frame(maxHeight: .infinity, alignment: .top)
+        }
+    }
+
+    func riquadroIPad(_ v: VoceStrumento) -> some View {
+        let on = v.nelPannello && v.id == scelto
+        return Button {
+            if premuto == v.id { premuto = nil; return }
+            apri(v)
+        } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                IconaTela(d: v.iconaIPad, colore: v.colore, lato: 22)
+                Spacer(minLength: 0)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(v.titolo).font(.system(size: 14, weight: .heavy)).foregroundStyle(Theme.testo).lineLimit(1)
+                    Text(v.sottoIPad).font(.system(size: 11)).foregroundStyle(Theme.dim).lineLimit(1)
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: 104)
+            .background(on ? Color(hex: 0x1D2416) : Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(on ? Theme.olive : Theme.stroke, lineWidth: on ? 2 : 1))
+            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(PressStyle())
+        .simultaneousGesture(LongPressGesture(minimumDuration: 0.5).onEnded { _ in
+            premuto = v.id
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            avviso = BarraRapidaStrumenti.metti(v)
+        })
+        .accessibilityLabel("\(v.titolo), \(v.sottoIPad)")
+        .accessibilityHint("Tieni premuto per metterlo nella barra rapida della mappa")
+    }
+
+    // MARK: telefono (tavola 64)
+
+    var contenutoTelefono: some View {
         VStack(alignment: .leading, spacing: 0) {
             // intestazione: top 54, lati 16, titolo 30 nero, cerca 42
             HStack {
@@ -240,6 +348,7 @@ struct StrumentiV3: View {
     func apri(_ v: VoceStrumento) {
         haptic()
         RecentiStrumenti.usa(v.id)
+        if classe == .regular && v.nelPannello { scelto = v.id; return }
         percorso.append(v.id)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { recenti = RecentiStrumenti.elenco }
     }

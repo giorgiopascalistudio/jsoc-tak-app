@@ -53,6 +53,7 @@ jobs:
             shot associazione 6 -debug.tab 3 $L
             shot strumenti 6 -debug.tab 5 $L
             shot profilo 8 -debug.tab 4 $L
+            shot mappa 18 -debug.tab 1 -debug.mappa.dati YES -night.on NO $L
             if [ "$N" != "iPadProinch" ]; then
               shot 33-dati 9 -debug.tab 4 -debug.modulo dati -debug.scheda 0
               shot 34-datiB 9 -debug.tab 4 -debug.modulo dati -debug.scheda 1

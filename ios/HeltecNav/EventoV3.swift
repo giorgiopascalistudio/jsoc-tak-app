@@ -84,6 +84,7 @@ struct EventoV3: View {
     @ObservedObject private var jsoc = JsocClient.shared
     @ObservedObject private var store = EventoStore.shared
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var classe
     @State private var presenze: JPresenze?
     @State private var commenti: [JCommentoEvento] = []
     @State private var riepilogo = RiepilogoEvento()
@@ -114,10 +115,15 @@ struct EventoV3: View {
     /// mappa, documenti, spese, squadra e checklist si sbloccano con la presenza
     var dentro: Bool { mia == "si" || mia == "arbitro" || organizzatore }
     var rispondibile: Bool { !e.proposto && !e.annullato && !e.privato && e.fase != 2 }
+    /// iPad (tavola 68): scheda compatta accanto all'elenco
+    var ipad: Bool { classe == .regular && UIDevice.current.userInterfaceIdiom == .pad }
 
     var body: some View {
         let _ = Contatori.disegno("EventoV3")
         GeometryReader { g in
+            if incorporato && ipad && g.size.width >= 560 {
+                vistaIPad
+            } else {
             let alto = g.safeAreaInsets.top
             ZStack(alignment: .top) {
                 ScrollView {
@@ -135,6 +141,7 @@ struct EventoV3: View {
                 }
                 .padding(.horizontal, 14).padding(.top, 7)
                 if azioni { menuAzioni.transition(.opacity) }
+            }
             }
         }
         .background(Theme.bg.ignoresSafeArea())
@@ -446,20 +453,201 @@ struct EventoV3: View {
         }
     }
 
-    func riquadro(_ ic: String, _ c: Color, _ titolo: String, _ sotto: String, aperto: Bool = false, _ f: @escaping () -> Void) -> some View {
+    func riquadro(_ ic: String, _ c: Color, _ titolo: String, _ sotto: String, aperto: Bool = false, ipad: Bool = false, _ f: @escaping () -> Void) -> some View {
         let libero = aperto || dentro
         return Button { if libero { haptic(); f() } else { haptic(.soft); avviso = "Metti la presenza per aprire \(titolo.lowercased())" } } label: {
             VStack(spacing: 5) {
                 IconaTela(d: libero ? ic : Ic.lucchetto, colore: libero ? c : Color(hex: 0x5B6150), lato: 22)
-                Text(titolo).font(.system(size: 13, weight: .heavy)).foregroundStyle(libero ? Theme.testo : Color(hex: 0x6F7564))
-                if libero { Text(sotto).font(.system(size: 10)).foregroundStyle(Theme.dim).lineLimit(1) }
+                Text(titolo).font(.system(size: ipad ? 13.5 : 13, weight: .heavy)).foregroundStyle(libero ? Theme.testo : Color(hex: 0x6F7564))
+                if libero { Text(sotto).font(.system(size: ipad ? 10.5 : 10)).foregroundStyle(Theme.dim).lineLimit(1) }
             }
             .padding(.horizontal, 6)
-            .frame(maxWidth: .infinity).frame(height: 74)
+            .frame(maxWidth: .infinity).frame(height: ipad ? 84 : 74)
             .background(libero ? Theme.surface : Color(hex: 0x0F130C), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.olive.opacity(libero ? 0.3 : 0.12)))
         }
         .buttonStyle(PressStyle())
+    }
+
+    // MARK: iPad (tavola 68): copertina 170, risposta + conteggi su una riga, riquadri 3×2 a sinistra e commenti a destra
+
+    /// tavola: il corpo finisce 22 pt dal fondo dello schermo (anche sopra la barretta di sistema)
+    var vistaIPad: some View {
+        ZStack {
+            VStack(alignment: .leading, spacing: 12) {
+                copertinaIPad
+                if rispondibile || !e.proposto { rigaRispostaIPad }
+                Group {
+                    if e.annullato { cartello("Evento annullato: resta in archivio, non conta nelle presenze", Theme.red) }
+                    if e.privato { nascosto }
+                    if e.proposto && !e.privato { proposta }
+                    if mia == "attesa" { Text("Posti finiti: sei in lista d'attesa, entri appena qualcuno si ritira.").font(.system(size: 11.5, weight: .bold)).foregroundStyle(Theme.amber) }
+                    if let avviso { Text(avviso).font(.system(size: 11.5, weight: .bold)).foregroundStyle(Theme.oliveBright) }
+                    if let errore { Text(errore).font(.system(size: 11.5, weight: .bold)).foregroundStyle(Theme.red) }
+                }
+                GeometryReader { g in
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            if !e.proposto { riquadriIPad }
+                            if let n = e.note, !n.isEmpty {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("DESCRIZIONE").font(.system(size: 11, weight: .heavy)).tracking(0.44).foregroundStyle(Theme.dim)
+                                    Text(n).font(.system(size: 13.5)).foregroundStyle(Theme.testo2).lineLimit(8)
+                                }
+                                .padding(.top, 4)
+                            }
+                        }
+                        .frame(width: (g.size.width - 12) * 1.15 / 2.15, alignment: .topLeading)
+                        commentiIPad
+                    }
+                }
+            }
+            .padding(.leading, 20).padding(.trailing, 22).padding(.top, 26).padding(.bottom, 22)
+            .ignoresSafeArea(.container, edges: .bottom)
+            if azioni { menuAzioni.transition(.opacity) }
+        }
+    }
+
+    /// "Dom 22 nov · 08:30–13:00 · Campo Calimera"
+    var sottoIPad: String {
+        var p: [String] = []
+        if let i = e.dataInizio {
+            let g = FormatiEventi.giornoBreve.string(from: i)
+            p.append(g.prefix(1).uppercased() + g.dropFirst())
+            p.append(FormatiEventi.ora.string(from: i) + (e.dataFine.map { "–" + FormatiEventi.ora.string(from: $0) } ?? ""))
+        }
+        if let l = e.luogo, !l.isEmpty { p.append(l) }
+        return p.joined(separator: " · ")
+    }
+
+    var copertinaIPad: some View {
+        ZStack(alignment: .bottomLeading) {
+            if let c = e.copertina, !c.isEmpty { CopertinaTela(evento: e) } else { Color(hex: 0x26301A) }
+            VStack(alignment: .leading, spacing: 0) {
+                etichette
+                Text(e.nome).font(.system(size: 28, weight: .black)).foregroundStyle(Theme.testo)
+                    .lineLimit(1).minimumScaleFactor(0.7).padding(.top, 6)
+                Text(sottoIPad).font(.system(size: 13.5)).foregroundStyle(Theme.testo2).lineLimit(1).padding(.top, 3)
+            }
+            .padding(.leading, 20).padding(.trailing, 70).padding(.bottom, 16)
+        }
+        .frame(maxWidth: .infinity).frame(height: 170)
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(alignment: .topTrailing) {
+            Button { haptic(); withAnimation(.easeOut(duration: 0.2)) { azioni = true } } label: {
+                IconaTela(d: Ic.puntini, colore: Theme.testo, lato: 22, spessore: 2)
+                    .frame(width: 42, height: 42).background(Theme.bg.opacity(0.7), in: Circle())
+            }
+            .buttonStyle(PressStyle())
+            .accessibilityLabel("Altre azioni")
+            .padding(.trailing, 16).padding(.top, 14)
+        }
+    }
+
+    var rigaRispostaIPad: some View {
+        let si = mia == "si" || mia == "attesa"
+        let c = presenze?.conta
+        let voci: [(Int, String, Color, String)] = [
+            (c?.si ?? e.n_si ?? 0, "sì", Theme.oliveBright, "si"),
+            ((c?.no ?? e.n_no ?? 0) + (c?.forse ?? 0), "no", Theme.red, "no"),
+            (c?.arbitro ?? 0, "arbitro", Theme.cyan, "arbitro"),
+            ((c?.senza_risposta ?? 0) + (c?.attesa ?? e.n_attesa ?? 0), "attesa", Theme.amber, "senza"),
+        ]
+        return HStack(spacing: 10) {
+            if rispondibile {
+                Group {
+                    tastoIPad("Partecipo", "si", pieno: si || mia == nil, fondo: Theme.olive, spunta: true)
+                    tastoIPad("Non partecipo", "no", pieno: mia == "no" || mia == "forse", fondo: Theme.red)
+                    tastoIPad("Arbitro", "arbitro", pieno: mia == "arbitro", fondo: Theme.cyan)
+                }
+                .disabled(e.iscrizioniChiuse && jsoc.utente?.direttivo != true)
+            }
+            Spacer(minLength: 0)
+            if !e.proposto {
+                ForEach(voci, id: \.1) { v in
+                    Button { if presenze != nil { haptic(.soft); apriRisposte = v.3 } } label: {
+                        VStack(spacing: 0) {
+                            Text("\(v.0)").font(Theme.mono(19, .heavy)).foregroundStyle(v.2)
+                            Text(v.1).font(.system(size: 10.5, weight: .bold)).foregroundStyle(Theme.dim)
+                        }
+                        .frame(minWidth: 54).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    func tastoIPad(_ t: String, _ r: String, pieno: Bool, fondo: Color, spunta: Bool = false) -> some View {
+        Button { scegli(r) } label: {
+            HStack(spacing: 6) {
+                if spunta && pieno { IconaTela(d: Ic.spuntaGrossa, colore: Theme.scuro, lato: 15, spessore: 2.6) }
+                Text(t)
+            }
+            .font(.system(size: 14.5, weight: pieno ? .black : .heavy)).foregroundStyle(pieno ? Theme.scuro : Theme.testo)
+            .lineLimit(1).fixedSize()
+            .padding(.horizontal, 18).frame(height: 48)
+            .background(pieno ? fondo : .clear, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(pieno ? .clear : Theme.testo.opacity(0.18)))
+        }
+        .buttonStyle(PressStyle())
+    }
+
+    var riquadriIPad: some View {
+        let r = riepilogo
+        let spese: String = {
+            guard let s = r.saldo else { return "chi deve a chi" }
+            if s > 0.005 { return "mi devono \(euroTela(s))" }
+            if s < -0.005 { return "devo \(euroTela(-s))" }
+            return "in pari"
+        }()
+        let colonne = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
+        return LazyVGrid(columns: colonne, spacing: 8) {
+            riquadro(Ic.persona, Theme.olive, "Presenze", "elenco · appello", aperto: true, ipad: true) { if presenze != nil { apriRisposte = "tutti" } }
+            riquadro(Ic.mappa, Theme.olive, "Mappa", r.punti.map { "\($0) punti" } ?? "squadra e punti", ipad: true) {
+                store.scegli(e); store.vistaSquadra = nil; vaiAllaScheda(Schede.mappa)
+            }
+            riquadro(Ic.file, Theme.amber, "Documenti", r.documenti.map { $0 > 0 ? "\($0) · analisi IA" : "nessun file" } ?? "file dell'evento", ipad: true) {
+                store.scegli(e); documenti = true
+            }
+            riquadro(Ic.carta, Theme.amber, "Spese", spese, ipad: true) { apriSpese = true }
+            riquadro(Ic.squadraEvento, Theme.red, "Squadra", "chat · piano", ipad: true) { store.scegli(e); apriSquadra = true }
+            riquadro(Ic.spunta, Theme.olive, "Checklist", (r.voci ?? 0) > 0 ? "\(r.pronti ?? 0) di \(r.voci ?? 0)" : "cosa porto", ipad: true) { apriChecklist = true }
+        }
+    }
+
+    var commentiIPad: some View {
+        let titolo = commenti.isEmpty ? "COMMENTI" : (nuovi > 0 ? "COMMENTI · \(nuovi) \(nuovi == 1 ? "NUOVO" : "NUOVI")" : "COMMENTI · \(commenti.count)")
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(titolo).font(.system(size: 12, weight: .heavy)).tracking(0.72).foregroundStyle(Theme.dim)
+                Spacer()
+                if !commenti.isEmpty { Text("tutti ›").font(.system(size: 12, weight: .heavy)).foregroundStyle(Theme.oliveBright) }
+            }
+            .padding(.bottom, 10)
+            ForEach(commenti.filter { $0.autore != io }.sorted { $0.ts > $1.ts }.prefix(3)) { k in
+                VStack(alignment: .leading, spacing: 2) {
+                    (Text(k.callsign ?? "?").font(Theme.mono(11.5, .heavy)).foregroundColor(Theme.oliveBright)
+                     + Text(" " + quando(k.ts)).font(.system(size: 11)).foregroundColor(Theme.dim))
+                    Text(k.testo).font(.system(size: 13.5)).foregroundStyle(Theme.testo).lineLimit(3).fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.vertical, 9)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .overlay(alignment: .top) { Rectangle().fill(Theme.olive.opacity(0.12)).frame(height: 1) }
+            }
+            Text("Scrivi un commento…").font(.system(size: 13)).foregroundStyle(Color(hex: 0x7D8470))
+                .padding(.horizontal, 14).frame(maxWidth: .infinity, alignment: .leading).frame(height: 40)
+                .background(Theme.surface2, in: Capsule())
+                .overlay(Capsule().strokeBorder(Theme.stroke))
+                .padding(.top, 8)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Theme.stroke))
+        .contentShape(Rectangle())
+        .onTapGesture { haptic(); apriCommenti = true }
     }
 
     // MARK: stati particolari (non nelle tavole: compaiono solo quando servono)

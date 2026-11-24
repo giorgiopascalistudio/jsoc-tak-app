@@ -185,9 +185,34 @@ struct AssociazioneDirettivoV3: View {
     @State private var crea: String?
     @State private var messaggio: String?
     @State private var vai: String?
+    @Environment(\.horizontalSizeClass) private var classe
 
     var body: some View {
         let _ = Contatori.disegno("AssociazioneDirettivoV3")
+        Group {
+            if classe == .regular { contenutoIPad } else { contenutoTelefono }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(Theme.bg.ignoresSafeArea())
+        .toolbar(.hidden, for: .navigationBar)
+        .navigationDestination(isPresented: $debugAperto) { vistaDebug }
+        .navigationDestination(isPresented: Binding(get: { vai != nil }, set: { if !$0 { vai = nil } })) {
+            if vai == "assemblee" { AssembleeView() } else { NuovoMovimentoV3() }
+        }
+        .sheet(item: Binding(get: { crea.map { CreaDir(id: $0) } }, set: { crea = $0?.id })) { c in
+            switch c.id {
+            case "avviso": NuovoPostSheet { _ in }
+            case "sondaggio": NuovoSondaggioSheet { _ in }
+            default: InvitoSheet()
+            }
+        }
+        .alert(messaggio ?? "", isPresented: Binding(get: { messaggio != nil }, set: { if !$0 { messaggio = nil } })) { Button("OK") {} }
+        .task { await carica() }
+    }
+
+    // MARK: telefono (tavola 47)
+
+    var contenutoTelefono: some View {
         VStack(alignment: .leading, spacing: 0) {
             intestazione
             if scheda == 0 {
@@ -208,22 +233,134 @@ struct AssociazioneDirettivoV3: View {
                 AssociazioneSocio()   // "Come socio": la vista del socio normale (tavola 43)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(Theme.bg.ignoresSafeArea())
-        .toolbar(.hidden, for: .navigationBar)
-        .navigationDestination(isPresented: $debugAperto) { vistaDebug }
-        .navigationDestination(isPresented: Binding(get: { vai != nil }, set: { if !$0 { vai = nil } })) {
-            if vai == "assemblee" { AssembleeView() } else { NuovoMovimentoV3() }
+    }
+
+    // MARK: iPad (tavola 69): a sinistra la home del direttivo, a destra la colonna SOCI (larga 362)
+
+    var contenutoIPad: some View {
+        GeometryReader { g in
+            let largo = g.size.width > g.size.height
+            HStack(alignment: .top, spacing: 24) {
+                VStack(alignment: .leading, spacing: 12) {
+                    intestazioneIPad
+                    if scheda == 0 {
+                        ScrollView {
+                            VStack(spacing: 12) {
+                                daFareIPad
+                                grigliaIPad
+                                altroIPad
+                            }
+                            .padding(.bottom, 22)
+                        }
+                        .scrollIndicators(.hidden)
+                        .refreshable { await carica() }
+                    } else {
+                        AssociazioneSocio()   // "Come socio": la vista del socio, centrata (larghezza massima 760)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                if largo && scheda == 0 {
+                    VStack(spacing: 12) {
+                        Color.clear.frame(height: 58)
+                        SociColonnaIPad()
+                    }
+                    .frame(width: min(362, g.size.width * 0.34))
+                    .padding(.bottom, 22)
+                }
+            }
+            .padding(.leading, 30).padding(.trailing, 22).padding(.top, 26)
         }
-        .sheet(item: Binding(get: { crea.map { CreaDir(id: $0) } }, set: { crea = $0?.id })) { c in
-            switch c.id {
-            case "avviso": NuovoPostSheet { _ in }
-            case "sondaggio": NuovoSondaggioSheet { _ in }
-            default: InvitoSheet()
+    }
+
+    /// sottotitolo 12 maiuscolo, titolo 30; a destra Gestione/Come socio (260) e "+ Crea" (44), allineati in basso
+    var intestazioneIPad: some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("BAS JSOC · FIGT · COMITATO PUGLIA E BASILICATA")
+                    .font(.system(size: 12, weight: .heavy)).tracking(0.96).foregroundStyle(Theme.dim)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Associazione").font(.system(size: 30, weight: .black)).tracking(-0.6).foregroundStyle(Theme.testo).lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            SchedeTela(voci: ["Gestione", "Come socio"], scelta: $scheda).frame(width: 260)
+            menuCrea {
+                Text("+ Crea").font(.system(size: 14.5, weight: .black)).foregroundStyle(Theme.scuro).lineLimit(1)
+                    .padding(.horizontal, 18).frame(height: 44)
+                    .background(Theme.olive, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .fixedSize()
             }
         }
-        .alert(messaggio ?? "", isPresented: Binding(get: { messaggio != nil }, set: { if !$0 { messaggio = nil } })) { Button("OK") {} }
-        .task { await carica() }
+    }
+
+    /// DA FARE ORA iPad: raggio 20, righe 12/14 con numero 34 e tasto 36
+    @ViewBuilder var daFareIPad: some View {
+        let righe = righeDaFare(grande: true)
+        VStack(spacing: 0) {
+            Text("DA FARE ORA").font(.system(size: 12, weight: .heavy)).tracking(0.72).foregroundStyle(Theme.amber)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 4)
+            if righe.isEmpty {
+                Text("Tutto in ordine: niente da fare adesso.").font(.system(size: 14.5, weight: .bold)).foregroundStyle(Theme.testo2)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 14).padding(.vertical, 12)
+            }
+            ForEach(Array(righe.enumerated()), id: \.offset) { _, v in
+                HStack(spacing: 12) {
+                    Text("\(v.numero)").font(Theme.mono(15, .heavy)).foregroundStyle(v.colore)
+                        .frame(minWidth: 34, minHeight: 34).background(v.colore.opacity(0.15), in: Capsule())
+                    Text(v.testo).font(.system(size: 14.5, weight: .bold)).foregroundStyle(Theme.testo)
+                        .frame(maxWidth: .infinity, alignment: .leading).fixedSize(horizontal: false, vertical: true)
+                    v.tasto
+                }
+                .padding(.horizontal, 14).padding(.vertical, 12)
+                .overlay(alignment: .top) { Rectangle().fill(Theme.olive.opacity(0.12)).frame(height: 1) }
+            }
+        }
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Theme.amber.opacity(0.4)))
+    }
+
+    /// 6 voci in 3 colonne (spazio 10), alte 104, icona 24, titolo 16, sotto 12
+    var grigliaIPad: some View {
+        let saldo = home.dati?.direttivo?.saldo
+        let soci = home.dati?.soci_attivi ?? 0
+        let c = GridItem(.flexible(), spacing: 10)
+        return LazyVGrid(columns: [c, c, c], spacing: 10) {
+            voceIPad(Ic.sociIPad, Theme.oliveBright, "Soci", soci > 0 ? "\(soci) · schede e documenti" : "schede e documenti") { SociDirettivoV3() }
+            voceIPad(Ic.carta, Theme.amber, "Tesseramento", "FIGT e assicurazione") { TesseramentoView() }
+            voceIPad(Ic.dollaro, Theme.amber, "Cassa", saldo.map { "saldo " + euroIT($0) } ?? "conti e movimenti") { CassaV2View() }
+            voceIPad(Ic.nuovoSocio, Theme.amber, "Nuovi soci", "aspiranti e domande") { AspirantiView() }
+            voceIPad(Ic.comunicazioniIPad, Theme.cyan, "Comunicazioni", "avvisi e sondaggi") { ComunicazioniDir() }
+            voceIPad(Ic.assemblee, Theme.cyan, "Assemblee", r.prossimaAssemblea.map { "prossima \($0)" } ?? "convocazioni e voti") { AssembleeView() }
+        }
+    }
+
+    func voceIPad<D: View>(_ icona: String, _ colore: Color, _ titolo: String, _ sotto: String, @ViewBuilder dest: @escaping () -> D) -> some View {
+        NavigationLink { dest() } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                IconaTela(d: icona, colore: colore, lato: 24)
+                Spacer(minLength: 0)
+                Text(titolo).font(.system(size: 16, weight: .heavy)).foregroundStyle(Theme.testo).lineLimit(1)
+                Text(sotto).font(.system(size: 12)).foregroundStyle(Theme.dim).lineLimit(1).padding(.top, 2)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading).frame(height: 104)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Theme.stroke))
+        }
+        .buttonStyle(PressStyle())
+    }
+
+    /// riga "Altro · …" alta 52, testo 14
+    var altroIPad: some View {
+        NavigationLink { AltroDirettivo() } label: {
+            Text("Altro · Libro soci, Gruppi, Cariche, Ricevute, Riunioni, Stampe, Magazzino ›")
+                .font(.system(size: 14, weight: .heavy)).foregroundStyle(Theme.testo).lineLimit(1).minimumScaleFactor(0.8)
+                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity, alignment: .leading).frame(height: 52)
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).strokeBorder(Theme.stroke))
+        }
+        .buttonStyle(PressStyle())
     }
 
     struct CreaDir: Identifiable { let id: String }
@@ -247,13 +384,7 @@ struct AssociazioneDirettivoV3: View {
                 Text("BAS JSOC · FIGT · Comitato Puglia e Basilicata").font(.system(size: 11.5)).foregroundStyle(Theme.dim).lineLimit(1)
             }
             Spacer(minLength: 0)
-            Menu {
-                Button { vai = "movimento" } label: { Label("Movimento di cassa", systemImage: "eurosign.circle") }
-                Button { crea = "avviso" } label: { Label("Avviso ai soci", systemImage: "megaphone") }
-                Button { crea = "sondaggio" } label: { Label("Sondaggio", systemImage: "chart.bar") }
-                Button { vai = "assemblee" } label: { Label("Assemblea", systemImage: "building.columns") }
-                Button { crea = "invito" } label: { Label("Invito per un nuovo socio", systemImage: "qrcode") }
-            } label: {
+            menuCrea {
                 HStack(spacing: 6) {
                     IconaTela(d: Ic.piu, colore: Theme.scuro, lato: 16)
                     Text("Crea").font(.system(size: 13.5, weight: .black))
@@ -266,10 +397,21 @@ struct AssociazioneDirettivoV3: View {
         .padding(.horizontal, 16).padding(.top, 7)
     }
 
+    /// menu "+ Crea" (telefono e iPad, cambia solo l'aspetto del tasto)
+    func menuCrea<L: View>(@ViewBuilder _ etichetta: () -> L) -> some View {
+        Menu {
+            Button { vai = "movimento" } label: { Label("Movimento di cassa", systemImage: "eurosign.circle") }
+            Button { crea = "avviso" } label: { Label("Avviso ai soci", systemImage: "megaphone") }
+            Button { crea = "sondaggio" } label: { Label("Sondaggio", systemImage: "chart.bar") }
+            Button { vai = "assemblee" } label: { Label("Assemblea", systemImage: "building.columns") }
+            Button { crea = "invito" } label: { Label("Invito per un nuovo socio", systemImage: "qrcode") }
+        } label: { etichetta() }
+    }
+
     // MARK: DA FARE ORA (bordo ambra 40%, righe con numero tondo 30 e tasto 34)
 
     @ViewBuilder var daFare: some View {
-        let righe = righeDaFare
+        let righe = righeDaFare()
         VStack(spacing: 0) {
             HStack {
                 Text("DA FARE ORA").font(.system(size: 11, weight: .heavy)).tracking(0.66).foregroundStyle(Theme.amber)
@@ -301,25 +443,27 @@ struct AssociazioneDirettivoV3: View {
 
     struct VoceDaFare { let numero: Int; let colore: Color; let testo: String; let tasto: AnyView }
 
-    func tasto(_ t: String, _ c: Color) -> some View {
-        Text(t).font(.system(size: 12, weight: .black)).foregroundStyle(Theme.scuro)
-            .padding(.horizontal, 12).frame(height: 34).background(c, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+    /// tasto azione: telefono 34 (testo 12), iPad 36 (testo 14,5, lati 18, raggio 14)
+    func tasto(_ t: String, _ c: Color, grande: Bool = false) -> some View {
+        Text(t).font(.system(size: grande ? 14.5 : 12, weight: .black)).foregroundStyle(Theme.scuro)
+            .padding(.horizontal, grande ? 18 : 12).frame(height: grande ? 36 : 34)
+            .background(c, in: RoundedRectangle(cornerRadius: grande ? 14 : 11, style: .continuous))
     }
 
-    var righeDaFare: [VoceDaFare] {
+    func righeDaFare(grande g: Bool = false) -> [VoceDaFare] {
         var v: [VoceDaFare] = []
         if r.nonAssicurati > 0 {
             v.append(VoceDaFare(numero: r.nonAssicurati, colore: Theme.red,
                                 testo: (r.nonAssicurati == 1 ? "socio non assicurato" : "soci non assicurati") + ": carica i nomi su FIGT",
-                                tasto: AnyView(NavigationLink { TesseramentoView() } label: { tasto("Carica", Theme.red) }.buttonStyle(PressStyle()))))
+                                tasto: AnyView(NavigationLink { TesseramentoView() } label: { tasto("Carica", Theme.red, grande: g) }.buttonStyle(PressStyle()))))
         }
         if r.richieste > 0 {
             v.append(VoceDaFare(numero: r.richieste, colore: Theme.oliveBright, testo: r.testoRichieste,
-                                tasto: AnyView(NavigationLink { RichiesteDirettivo(spese: r.spese) } label: { tasto("Apri", Theme.oliveBright) }.buttonStyle(PressStyle()))))
+                                tasto: AnyView(NavigationLink { RichiesteDirettivo(spese: r.spese) } label: { tasto("Apri", Theme.oliveBright, grande: g) }.buttonStyle(PressStyle()))))
         }
         if r.scadenze > 0 {
             v.append(VoceDaFare(numero: r.scadenze, colore: Theme.amber, testo: "certificati o quote in scadenza entro 30 giorni",
-                                tasto: AnyView(Button { Task { await ricorda() } } label: { tasto("Ricorda", Theme.amber) }.buttonStyle(PressStyle()))))
+                                tasto: AnyView(Button { Task { await ricorda() } } label: { tasto("Ricorda", Theme.amber, grande: g) }.buttonStyle(PressStyle()))))
         }
         return v
     }

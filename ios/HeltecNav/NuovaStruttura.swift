@@ -56,7 +56,7 @@ struct ColonnaIPad: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            Button { vaiAllaScheda(Schede.home); NotificationCenter.default.post(name: .apriProfilo, object: nil) } label: {
+            Button { haptic(.soft); tab = Schede.profilo } label: {   // iPad: il Profilo è una scheda a due pannelli (tavola IPadProfilo13)
                 Avatar(lato: 46, bordo: 2, testo: 15)
             }
             .accessibilityLabel("Profilo")
@@ -240,6 +240,7 @@ struct CopertinaEvento: View {
         .frame(height: altezza)
         .frame(maxWidth: .infinity)
         .clipped()
+        .contentShape(Rectangle())   // i tocchi restano dentro la copertina
         .task(id: "\(evento.id)-\(evento.copertina ?? "")") {
             guard let v = evento.copertina, !v.isEmpty else { img = nil; return }
             let f = EventoStore.cartella.appendingPathComponent("copertina_\(evento.id)_\(v).jpg")

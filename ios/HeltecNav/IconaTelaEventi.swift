@@ -16,4 +16,6 @@ extension Ic {
     static let cestino = "M4 7h16 M9 7V4h6v3 M6 7l1 13h10l1-13"
     static let orologio = "M12 7v5l3 2 M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"
     static let inviaCommento = "M4 12l16-8-6 16-2-7Z"
+    /// riquadro Squadra dell'iPad (tavola 68): una persona sola
+    static let squadraEvento = "M15 19c0-3-2.5-5-6-5s-6 2-6 5 M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"
 }
