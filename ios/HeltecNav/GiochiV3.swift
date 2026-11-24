@@ -13,7 +13,10 @@ struct GiochiV3: View {
     @AppStorage("strum.prova.tentativi") private var tentativi = 3
     @State private var partita = false
 
-    init(scheda: Int = 0) { _scheda = State(initialValue: scheda) }
+    /// iPad (tavola 70): nel pannello a destra di Strumenti, senza tasto indietro
+    var pannello = false
+
+    init(scheda: Int = 0, pannello: Bool = false) { _scheda = State(initialValue: scheda); self.pannello = pannello }
 
     /// i 9 riquadri della tavola → tipi di prova esistenti
     static let prove: [(TipoProva, String, String, String)] = [
@@ -34,6 +37,10 @@ struct GiochiV3: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            if pannello {
+                Text("Giochi e missioni").font(.system(size: 30, weight: .black)).tracking(-0.6).foregroundStyle(Theme.testo)
+                    .padding(.top, 2)
+            } else {
             // intestazione: top 54, lati 14
             HStack(spacing: 8) {
                 Button { chiudi() } label: {
@@ -45,14 +52,15 @@ struct GiochiV3: View {
                 Spacer()
             }
             .padding(.horizontal, 14).padding(.top, 7)
+            }
 
             // corpo: top 108, lati 14, spazio 11
             SchedeTela(voci: ["Prove pronte", "Missioni", "Da campo"], scelta: $scheda)
-                .padding(.horizontal, 14).padding(.top, 12)
+                .padding(.horizontal, pannello ? 0 : 14).padding(.top, 12)
 
             switch scheda {
             case 0:
-                ScrollView(showsIndicators: false) { provePronte.padding(.horizontal, 14).padding(.top, 11).padding(.bottom, 30) }
+                ScrollView(showsIndicators: false) { provePronte.padding(.horizontal, pannello ? 0 : 14).padding(.top, 11).padding(.bottom, 30) }
             case 1:
                 MissioniView().padding(.top, 4)
             default:
@@ -61,8 +69,8 @@ struct GiochiV3: View {
         }
         .background(Theme.bg.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
-        .onAppear { ModuliAperti.shared.aperti += 1 }        // tavola 66: senza la barra in basso
-        .onDisappear { ModuliAperti.shared.aperti = max(0, ModuliAperti.shared.aperti - 1) }
+        .onAppear { if !pannello { ModuliAperti.shared.aperti += 1 } }        // tavola 66: senza la barra in basso
+        .onDisappear { if !pannello { ModuliAperti.shared.aperti = max(0, ModuliAperti.shared.aperti - 1) } }
         .fullScreenCover(isPresented: $partita) {
             PartitaProva(tipi: [tipo], livello: livello, squadra: "", minuti: minuti, tentativi: tentativi, estrema: difficolta == 3) {
                 partita = false
