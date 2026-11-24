@@ -291,8 +291,15 @@ struct SociDirettivoV3: View {
             if let s = DebugDir.scorri, let i = righe.firstIndex(where: { $0.callsign == s }) { dimostrazione = righe.remove(at: i) }
             return
         }
+        guard let n = await Self.righeDalServer() else { avviso = "Non riesco a leggere i soci dal server."; return }
+        righe = n; totale = nil
+    }
+
+    /// soci (ordinati per carica) + aspiranti; nil se il server non risponde. Serve anche alla colonna SOCI dell iPad.
+    static func righeDalServer() async -> [SocioRigaDir]? {
+        let jsoc = JsocClient.shared
         // stagione delle quote: da novembre quella dell anno dopo (assicurazione e quota della stessa stagione, come le tavole)
-        guard let t = try? await jsoc.tesseramento(AnnoDir.quota) else { avviso = "Non riesco a leggere i soci dal server."; return }
+        guard let t = try? await jsoc.tesseramento(AnnoDir.quota) else { return nil }
         let libro = (try? await jsoc.libroSoci()) ?? []
         let asp = try? await jsoc.aspiranti()
         let ordine = ["presidente": 0, "vicepresidente": 1, "segretario": 2, "tesoriere": 3, "consigliere": 4]
@@ -311,7 +318,102 @@ struct SociDirettivoV3: View {
                                   aspirante: true, uscite: a.uscite.count, usciteRichieste: asp?.uscite_richieste ?? 3,
                                   telefono: libro.first { $0.id == a.id }?.telefono, rango: 9))
         }
-        righe = n; totale = nil
+        return n
+    }
+}
+
+// MARK: - Colonna SOCI dell iPad (tavola 69): Invita, Cerca, righe con un solo stato e la carica
+
+struct SociColonnaIPad: View {
+    @State private var righe: [SocioRigaDir] = []
+    @State private var cerca = ""
+    @State private var scelto: SocioRigaDir?
+    @State private var invita = false
+    @State private var caricati = false
+
+    var visibili: [SocioRigaDir] {
+        righe.filter { !$0.aspirante && (cerca.isEmpty || "\($0.callsign) \($0.nome) \($0.carica)".localizedCaseInsensitiveContains(cerca)) }
+    }
+
+    /// lo stato più urgente: non assicurato, quota da pagare, certificato in scadenza, altrimenti assicurato
+    static func stato(_ r: SocioRigaDir) -> StatoDir {
+        if !r.assicurato { return StatoDir(testo: "non assicurato", colore: Theme.red) }
+        if r.quotaDaPagare { return StatoDir(testo: "quota \(AnnoDir.quota)", colore: Theme.amber) }
+        if let g = r.giorniCertificato, g <= 30 { return StatoDir(testo: g < 0 ? "certificato scaduto" : "certificato \(g) g", colore: g < 0 ? Theme.red : Theme.amber) }
+        return StatoDir(testo: "assicurato", colore: Theme.oliveBright)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("SOCI").font(.system(size: 12, weight: .heavy)).tracking(0.72).foregroundStyle(Theme.dim)
+                Spacer()
+                Button { invita = true } label: {
+                    Text("Invita ›").font(.system(size: 12, weight: .heavy)).foregroundStyle(Theme.oliveBright)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.bottom, 10)
+            HStack(spacing: 8) {
+                IconaTela(d: Ic.cerca, colore: Theme.dim, lato: 15)
+                ZStack(alignment: .leading) {
+                    if cerca.isEmpty { Text("Cerca").font(.system(size: 13.5)).foregroundStyle(Color(hex: 0x7D8470)) }
+                    TextField("", text: $cerca).font(.system(size: 13.5)).foregroundStyle(Theme.testo)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                }
+            }
+            .padding(.horizontal, 12).frame(height: 40)
+            .background(Theme.barra, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.stroke))
+            .padding(.bottom, 6)
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    let v = visibili
+                    if v.isEmpty {
+                        Text(caricati ? "Nessun socio" : "Carico i soci…").font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.dim)
+                            .frame(maxWidth: .infinity).frame(height: 58)
+                    }
+                    ForEach(v) { r in
+                        Button { haptic(); scelto = r } label: { riga(r) }.buttonStyle(PressStyle())
+                    }
+                }
+            }
+            .scrollIndicators(.hidden)
+            .scrollDismissesKeyboard(.immediately)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Theme.stroke))
+        .navigationDestination(isPresented: Binding(get: { scelto != nil }, set: { if !$0 { scelto = nil } })) {
+            if let s = scelto { SchedaSocioDirettivo(id: s.id, sigla: s.sigla, aspirante: s.aspirante) }
+        }
+        .sheet(isPresented: $invita) { InvitoSheet() }
+        .task {
+            if Anteprima.attiva { righe = Anteprima.dirSoci; caricati = true; return }
+            righe = await SociDirettivoV3.righeDalServer() ?? []
+            caricati = true
+        }
+    }
+
+    /// riga: lati 4, alto 10+38+10, avatar 38, callsign mono 14 + nome 12, stato 11, carica 10,5
+    func riga(_ r: SocioRigaDir) -> some View {
+        let s = Self.stato(r)
+        return HStack(spacing: 12) {
+            AvatarDir(id: r.id, sigla: r.sigla)
+            VStack(alignment: .leading, spacing: 2) {
+                (Text(r.callsign).font(Theme.mono(14, .heavy)).foregroundColor(Theme.testo)
+                 + Text(" ").font(.system(size: 12))
+                 + Text(r.nome).font(.system(size: 12)).foregroundColor(Theme.dim))
+                    .lineLimit(1)
+                Text("● " + s.testo).font(.system(size: 11, weight: .heavy)).foregroundStyle(s.colore).lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Text(r.carica).font(.system(size: 10.5, weight: .heavy)).foregroundStyle(Theme.dim).fixedSize()
+        }
+        .padding(.horizontal, 4).padding(.vertical, 10)
+        .contentShape(Rectangle())
+        .overlay(alignment: .top) { Rectangle().fill(Theme.olive.opacity(0.12)).frame(height: 1) }
     }
 }
 
