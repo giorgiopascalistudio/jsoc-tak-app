@@ -113,7 +113,8 @@ struct EventoV3: View {
     var organizzatore: Bool { e.staff || (e.creato_da != nil && e.creato_da == io) }
     var gestore: Bool { jsoc.utente?.direttivo == true || organizzatore }
     /// mappa, documenti, spese, squadra e checklist si sbloccano con la presenza
-    var dentro: Bool { mia == "si" || mia == "arbitro" || organizzatore }
+    /// (con "Non partecipo" restano chiusi anche per chi organizza o è staff)
+    var dentro: Bool { mia == "si" || mia == "arbitro" || (organizzatore && mia != "no") }
     var rispondibile: Bool { !e.proposto && !e.annullato && !e.privato && e.fase != 2 }
     /// iPad (tavola 68): scheda compatta accanto all'elenco
     var ipad: Bool { classe == .regular && UIDevice.current.userInterfaceIdiom == .pad }

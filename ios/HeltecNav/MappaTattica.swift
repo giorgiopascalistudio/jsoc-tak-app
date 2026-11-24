@@ -2129,6 +2129,7 @@ struct PannelloVideo: View {
         guard let u = JsocClient.shared.videoURL(nome) else { return }
         let p = AVPlayer(url: u)
         p.automaticallyWaitsToMinimizeStalling = false
+        p.agganciaAllaDiretta()
         player = p
         p.play()
     }

@@ -888,6 +888,7 @@ final class ModelloCella: ObservableObject {
         item.add(uscita)
         let p = AVPlayer(playerItem: item)
         p.isMuted = true
+        p.agganciaAllaDiretta()
         p.play()
         player = p
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in

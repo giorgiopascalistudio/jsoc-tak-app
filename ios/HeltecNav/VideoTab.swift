@@ -407,10 +407,11 @@ struct PlayerFlusso: View {
             guard let u = client.hlsURL(flusso.nome) else { return }
             let p = AVPlayer(url: u)
             p.automaticallyWaitsToMinimizeStalling = false
+            p.agganciaAllaDiretta()
             p.play()
             player = p
         }
-        .onDisappear { player?.pause() }
+        .onDisappear { player?.staccaDallaDiretta(); player?.pause() }
     }
 }
 
