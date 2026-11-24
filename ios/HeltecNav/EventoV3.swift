@@ -471,6 +471,7 @@ struct EventoV3: View {
 
     // MARK: iPad (tavola 68): copertina 170, risposta + conteggi su una riga, riquadri 3×2 a sinistra e commenti a destra
 
+    /// tavola: il corpo finisce 22 pt dal fondo dello schermo (anche sopra la barretta di sistema)
     var vistaIPad: some View {
         ZStack {
             VStack(alignment: .leading, spacing: 12) {
@@ -502,6 +503,7 @@ struct EventoV3: View {
                 }
             }
             .padding(.leading, 20).padding(.trailing, 22).padding(.top, 26).padding(.bottom, 22)
+            .ignoresSafeArea(.container, edges: .bottom)
             if azioni { menuAzioni.transition(.opacity) }
         }
     }
