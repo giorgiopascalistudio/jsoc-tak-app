@@ -40,6 +40,10 @@ struct EventiV3: View {
     @State private var espansi: Set<String> = []
     @State private var scelto: JEvento?
     @State private var debugFatto = false
+    @Environment(\.horizontalSizeClass) private var classe
+
+    /// iPad (tavola 68): elenco semplice a sinistra e scheda compatta a destra. Il telefono resta com'era.
+    var ipad: Bool { classe == .regular && UIDevice.current.userInterfaceIdiom == .pad }
 
     var body: some View {
         let _ = Contatori.disegno("EventiV3")
@@ -78,7 +82,9 @@ struct EventiV3: View {
 
     var contenuto: some View {
         GeometryReader { g in
-            if g.size.width > g.size.height || g.size.width > 700 {
+            if ipad {
+                contenutoIPad(g)
+            } else if g.size.width > g.size.height || g.size.width > 700 {
                 // orizzontale o iPad: elenco a sinistra, scheda dell'evento a destra
                 HStack(spacing: 0) {
                     elenco(largo: true).frame(width: min(400, g.size.width * 0.42))
@@ -92,6 +98,49 @@ struct EventiV3: View {
             } else {
                 elenco(largo: false)
             }
+        }
+    }
+
+    // MARK: iPad (tavola 68): elenco largo 400 a 24 dalla colonna, riga di separazione, scheda a destra
+
+    func contenutoIPad(_ g: GeometryProxy) -> some View {
+        HStack(spacing: 0) {
+            elencoIPad.frame(width: min(400, g.size.width * 0.42))
+                .padding(.leading, 24).padding(.trailing, 20).padding(.top, 26).padding(.bottom, 22)
+            Rectangle().fill(Theme.olive.opacity(0.16)).frame(width: 1).ignoresSafeArea()
+            if let e = scelto ?? visibili.first {
+                EventoV3(evento: e, incorporato: true).id(e.id)
+            } else {
+                Text("Scegli un evento").foregroundStyle(Theme.dim).frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+    }
+
+    var elencoIPad: some View {
+        let attivo = (scelto ?? visibili.first)?.id
+        return VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .bottom) {
+                Text("Eventi").font(.system(size: 30, weight: .black)).tracking(-0.6).foregroundStyle(Theme.testo).padding(.top, 2)
+                Spacer()
+                Button { haptic(); percorso.append(.nuovo) } label: {
+                    Text("+ Proponi").font(.system(size: 14.5, weight: .black)).foregroundStyle(Theme.scuro)
+                        .padding(.horizontal, 18).frame(height: 40)
+                        .background(Theme.olive, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(PressStyle())
+            }
+            schede
+            ScrollView {
+                VStack(spacing: 9) {
+                    if visibili.isEmpty { vuoto }
+                    ForEach(visibili) { e in
+                        Button { haptic(.soft); scelto = e } label: { RigaEventoIPad(evento: e, scelto: attivo == e.id) }
+                            .buttonStyle(PressStyle())
+                    }
+                }
+                .padding(.bottom, 20)
+            }
+            .refreshable { await store.aggiorna(jsoc) }
         }
     }
 
@@ -316,5 +365,45 @@ struct RigaEventoV3: View {
         case "attesa": return ("In lista d'attesa", Theme.amber)
         default: return evento.fase == 2 ? ("", Theme.dim) : ("Senza risposta", Theme.amber)
         }
+    }
+}
+
+/// riga dell'elenco iPad (tavola 68): data 46×50, nome 14,5, ora · luogo, stato a destra, scelta evidenziata
+struct RigaEventoIPad: View {
+    let evento: JEvento
+    let scelto: Bool
+    var body: some View {
+        let e = evento
+        let d = e.dataInizio
+        let s = RigaEventoV3(evento: e).stato
+        HStack(spacing: 12) {
+            VStack(spacing: 0) {
+                Text(d.map { FormatiEventi.meseBreve.string(from: $0).uppercased() } ?? "—")
+                    .font(.system(size: 9, weight: .heavy)).foregroundStyle(Theme.dim)
+                Text(d.map { String(Calendar.current.component(.day, from: $0)) } ?? "?")
+                    .font(Theme.mono(19, .heavy)).foregroundStyle(e.fase == 2 ? Theme.dim : Theme.testo)
+            }
+            .frame(width: 46, height: 50)
+            .background(e.colore.opacity(0.15), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(e.nome).font(.system(size: 14.5, weight: .heavy)).foregroundStyle(e.fase == 2 ? Theme.dim : Theme.testo).lineLimit(1)
+                Text(sottotitolo).font(.system(size: 11.5)).foregroundStyle(Theme.dim).lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Text(s.0 == "Partecipi" ? "Partecipo" : s.0).font(.system(size: 11, weight: .heavy)).foregroundStyle(s.1).lineLimit(1).fixedSize()
+        }
+        .padding(.horizontal, 12).padding(.vertical, 11)
+        .background(scelto ? Color(hex: 0x1D2416) : Theme.surface, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).strokeBorder(scelto ? Theme.olive : Theme.olive.opacity(0.18)))
+        .contentShape(Rectangle())
+    }
+
+    /// "08:30 · Campo Calimera" / "07:00 · Lecce · posti 4/12"
+    var sottotitolo: String {
+        var p: [String] = []
+        if let d = evento.dataInizio { p.append(evento.fase == 2 ? FormatiEventi.giornoBreve.string(from: d) : FormatiEventi.ora.string(from: d)) }
+        if let l = evento.luogo, !l.isEmpty { p.append(l) }
+        if let n = evento.posti, n > 0 { p.append("posti \(evento.n_si ?? 0)/\(n)") }
+        return p.joined(separator: " · ")
     }
 }

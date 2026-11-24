@@ -9,6 +9,8 @@ import Foundation
 extension Anteprima {
     static var schedaEventi: Bool { UserDefaults.standard.integer(forKey: "debug.tab") == Schede.eventi }
     static var apriEventi: String? { UserDefaults.standard.string(forKey: "debug.eventi.apri") }
+    /// -debug.eventi.cqb si: risposta al Domenicale CQB con conteggi e commenti della tavola 68 (iPad)
+    static var cqbTavola68: String? { UserDefaults.standard.string(forKey: "debug.eventi.cqb") }
 
     private static let fmtEv: DateFormatter = {
         let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd'T'HH:mm"; return f
@@ -25,7 +27,7 @@ extension Anteprima {
     static func conEventiTavole(_ base: [JEvento]) -> [JEvento] {
         guard schedaEventi else { return base }
         var b = base
-        if let i = b.firstIndex(where: { $0.id == 101 }) { b[i].creato_da = utente.id }
+        if let i = b.firstIndex(where: { $0.id == 101 }) { b[i].creato_da = utente.id; if let r = cqbTavola68 { b[i].mia_risposta = r } }
         if let i = b.firstIndex(where: { $0.id == 102 }) { b[i].breve = "solo direttivo" }
         if let i = b.firstIndex(where: { $0.id == 104 }) { b[i].breve = "deleghe aperte" }
         let r = UserDefaults.standard.string(forKey: "debug.eventi.risposta")
@@ -53,6 +55,10 @@ extension Anteprima {
     /// tavole 38-40: chi ha risposto (tavola 40: "5 soci" senza risposta)
     static func presenzeEvento(_ ev: Int) -> JPresenze? {
         if ev == idTappa { return presenzeTappa }
+        if ev == 101, let r = cqbTavola68 {   // tavola 68: 5 sì · 2 no · 1 arbitro · 35 attesa
+            return JPresenze(presenze: [JPresenza(utente: utente.id, callsign: utente.callsign, nome: utente.nome, risposta: r, presente: nil)],
+                             conta: JPresenze.Conta(si: 5, no: 2, forse: 0, senza_risposta: 35, attesa: 0, arbitro: 1))
+        }
         if ev == 101 { return JPresenze(presenze: [], conta: JPresenze.Conta(si: 12, no: 1, forse: 0, senza_risposta: 5, attesa: 0, arbitro: 0)) }
         return nil
     }
@@ -74,7 +80,7 @@ extension Anteprima {
         return [
             JCommentoEvento(id: 1, testo: "Porto io le cariche delle radio, ne ho 6.", ts: ts(-1, 18, 40), autore: 7, callsign: "RAVEN"),
             JCommentoEvento(id: 2, testo: "Chi ha posto in macchina da Lecce? Siamo in 2.", ts: ts(-1, 19, 2), autore: 8, callsign: "WOLF"),
-            ev == idTappa   // tavola 38: "4 nuovi", tutti di altri
+            ev == idTappa || (ev == 101 && cqbTavola68 != nil)   // tavole 38 e 68: "4 nuovi", tutti di altri
                 ? JCommentoEvento(id: 3, testo: "Iscrizione fatta, quota pagata.", ts: ts(-1, 17, 30), autore: 10, callsign: "VIPER")
                 : JCommentoEvento(id: 3, testo: "Io ho 3 posti, partenza 7:30 da piazza Mazzini.", ts: ts(-1, 19, 10), autore: utente.id, callsign: utente.callsign, risposta_a: 2),
             JCommentoEvento(id: 4, testo: ev == idTappa ? "Ricordate occhiali omologati: senza non si entra." : "Ricordate occhiali omologati: senza non si entra in campo.",
